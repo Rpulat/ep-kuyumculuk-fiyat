@@ -1,7 +1,9 @@
 import streamlit as st
 import requests
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
+import base64
 
 # =====================================================
 # SAYFA AYARLARI
@@ -12,6 +14,27 @@ st.set_page_config(
     page_icon="💎",
     layout="wide"
 )
+
+# =====================================================
+# TÜRKİYE SAATİ
+# =====================================================
+
+def turkiye_saati():
+    return datetime.now(ZoneInfo("Europe/Istanbul"))
+
+
+def turkiye_saati_formatli():
+    return turkiye_saati().strftime("%d.%m.%Y %H:%M")
+
+
+# =====================================================
+# LOGO YARDIMCI FONKSİYONU
+# =====================================================
+
+def logo_base64_yap(dosya_yolu):
+    with open(dosya_yolu, "rb") as file:
+        return base64.b64encode(file.read()).decode()
+
 
 # =====================================================
 # TASARIM
@@ -29,7 +52,6 @@ st.markdown("""
     --border: #e8d8a2;
 }
 
-/* Genel */
 html, body, [class*="css"]  {
     font-family: "Segoe UI", sans-serif;
 }
@@ -39,10 +61,22 @@ html, body, [class*="css"]  {
     padding-bottom: 2rem;
 }
 
-/* Header */
-.brand-wrap {
-    text-align: center;
-    margin-bottom: 10px;
+/* LOGO VE HEADER */
+.logo-area {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 10px;
+    margin-bottom: 18px;
+}
+
+.logo-img {
+    width: 190px;
+    max-width: 190px;
+    height: auto;
+    display: block;
+    object-fit: contain;
 }
 
 .main-title {
@@ -81,7 +115,6 @@ html, body, [class*="css"]  {
     box-shadow: 0 4px 12px rgba(0,0,0,0.04);
 }
 
-/* Başlıklar */
 .section-title {
     font-size: 30px;
     font-weight: 900;
@@ -90,7 +123,6 @@ html, body, [class*="css"]  {
     margin-bottom: 18px;
 }
 
-/* Kartlar */
 .gold-card {
     background: linear-gradient(180deg, #0d0d0d 0%, #060606 100%);
     border: 2px solid var(--gold);
@@ -122,7 +154,6 @@ html, body, [class*="css"]  {
     margin-top: 10px;
 }
 
-/* Büyük hesap fiyat kutusu */
 .price-box {
     font-size: 58px;
     color: var(--gold);
@@ -137,7 +168,6 @@ html, body, [class*="css"]  {
     margin-top: 6px;
 }
 
-/* Bilgi kutusu */
 .info-box {
     background: #fcfaf4;
     padding: 22px;
@@ -149,7 +179,6 @@ html, body, [class*="css"]  {
     color: #2b2b2b;
 }
 
-/* Not */
 .small-note {
     font-size: 14px;
     color: #666;
@@ -158,7 +187,6 @@ html, body, [class*="css"]  {
     line-height: 1.6;
 }
 
-/* Alt footer */
 .footer-brand {
     text-align: center;
     margin-top: 34px;
@@ -166,7 +194,6 @@ html, body, [class*="css"]  {
     color: #999;
 }
 
-/* Sidebar */
 .sidebar-title {
     font-size: 20px;
     font-weight: 800;
@@ -177,6 +204,30 @@ html, body, [class*="css"]  {
     font-size: 13px;
     color: #777;
     margin-bottom: 14px;
+}
+
+/* MOBİL UYUMLULUK */
+@media screen and (max-width: 768px) {
+    .logo-img {
+        width: 145px;
+        max-width: 145px;
+    }
+
+    .main-title {
+        font-size: 34px;
+    }
+
+    .subtitle {
+        font-size: 15px;
+    }
+
+    .gold-price {
+        font-size: 25px;
+    }
+
+    .price-box {
+        font-size: 38px;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -337,7 +388,8 @@ def has_altin_al():
                     "basarili": True,
                     "kaynak": kaynak["ad"],
                     "has_altin": gram_altin,
-                    "hata": None
+                    "hata": None,
+                    "cekilme_zamani": turkiye_saati_formatli()
                 }
 
             son_hatalar.append(f"{kaynak['ad']}: has altın bulunamadı")
@@ -349,7 +401,8 @@ def has_altin_al():
         "basarili": False,
         "kaynak": None,
         "has_altin": None,
-        "hata": son_hatalar
+        "hata": son_hatalar,
+        "cekilme_zamani": turkiye_saati_formatli()
     }
 
 
@@ -381,7 +434,7 @@ def yonetici_paneli():
 
         admin_sifre = st.text_input("Yönetici Şifresi", type="password")
 
-        DOGRU_SIFRE = "3471"
+        DOGRU_SIFRE = "1234"
 
         if admin_sifre != DOGRU_SIFRE:
             st.info("Yönetici ayarlarını açmak için şifre giriniz.")
@@ -439,24 +492,32 @@ def yonetici_paneli():
 # HEADER
 # =====================================================
 
-def header_olustur(kaynak, has_altin):
-    st.markdown("<div class='brand-wrap'>", unsafe_allow_html=True)
-
+def header_olustur(kaynak, has_altin, cekilme_zamani):
     if os.path.exists("logo.png"):
-        col_logo_1, col_logo_2, col_logo_3 = st.columns([1, 2, 1])
-        with col_logo_2:
-            st.image("logo.png", width=180)
+        logo_base64 = logo_base64_yap("logo.png")
+        st.markdown(f"""
+        <div class="logo-area">
+            <img class="logo-img" src="data:image/png;base64,{logo_base64}">
+        </div>
+        """, unsafe_allow_html=True)
     else:
         st.warning("Logo dosyası bulunamadı. Repo içine 'logo.png' adıyla yükleyin.")
 
-    st.markdown("<div class='main-title'>EP Kuyumculuk<br>Canlı Fiyat Ekranı</div>", unsafe_allow_html=True)
-    st.markdown("<div class='subtitle'>Güncel has altın verisine göre anlık fiyat panosu ve takı fiyat hesaplama ekranı</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='main-title'>EP Kuyumculuk<br>Canlı Fiyat Ekranı</div>",
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        "<div class='subtitle'>Güncel has altın verisine göre anlık fiyat panosu ve takı fiyat hesaplama ekranı</div>",
+        unsafe_allow_html=True
+    )
 
     st.markdown(f"""
     <div class='top-badges'>
         <div class='badge-box'>📡 Veri Kaynağı: {kaynak}</div>
         <div class='badge-box'>🟡 Canlı Has Altın: {para_formatla(has_altin)}</div>
-        <div class='badge-box'>🕒 Son Güncelleme: {datetime.now().strftime("%d.%m.%Y %H:%M")}</div>
+        <div class='badge-box'>🕒 Türkiye Saati: {cekilme_zamani}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -478,7 +539,7 @@ if not veri["basarili"]:
 has_altin = veri["has_altin"]
 fiyatlar = fiyatlari_olustur(has_altin)
 
-header_olustur(veri["kaynak"], has_altin)
+header_olustur(veri["kaynak"], has_altin, veri["cekilme_zamani"])
 
 # =====================================================
 # CANLI FİYAT PANOSU
@@ -611,7 +672,7 @@ st.markdown(f"""
     <b>Ürün Gramı:</b> {urun_gram:.2f} gr<br>
     <b>Baz Fiyat:</b> {para_formatla(baz_fiyat)}<br>
     <b>Canlı Has Altın:</b> {para_formatla(has_altin)}<br>
-    <b>Son Güncelleme:</b> {datetime.now().strftime("%d.%m.%Y %H:%M")}
+    <b>Türkiye Saati:</b> {veri["cekilme_zamani"]}
 </div>
 """, unsafe_allow_html=True)
 
