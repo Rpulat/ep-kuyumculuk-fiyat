@@ -18,11 +18,6 @@ st.set_page_config(
 # =====================================================
 # ADMIN MODU
 # =====================================================
-# Müşteri normal linkten girer:
-# https://epkuyumculuk.streamlit.app
-#
-# Yönetici özel linkten girer:
-# https://epkuyumculuk.streamlit.app/?admin=1
 
 ADMIN_MODE = st.query_params.get("admin") == "1"
 
@@ -113,8 +108,8 @@ html, body, [class*="css"]  {{
 }}
 
 .block-container {{
-    padding-top: 2rem;
-    padding-bottom: 2rem;
+    padding-top: 0.6rem;
+    padding-bottom: 1.2rem;
 }}
 
 .logo-area {{
@@ -122,49 +117,49 @@ html, body, [class*="css"]  {{
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-top: 10px;
-    margin-bottom: 18px;
+    margin-top: 0px;
+    margin-bottom: 6px;
 }}
 
 .logo-img {{
-    width: 190px;
-    max-width: 190px;
+    width: 115px;
+    max-width: 115px;
     height: auto;
     display: block;
     object-fit: contain;
 }}
 
 .main-title {{
-    font-size: 48px;
+    font-size: 38px;
     font-weight: 900;
     color: var(--text);
-    line-height: 1.15;
+    line-height: 1.12;
     text-align: center;
-    margin-top: 5px;
-    margin-bottom: 8px;
+    margin-top: 0px;
+    margin-bottom: 4px;
 }}
 
 .subtitle {{
-    font-size: 18px;
+    font-size: 15px;
     color: var(--muted);
     text-align: center;
-    margin-bottom: 25px;
+    margin-bottom: 14px;
 }}
 
 .top-badges {{
     display: flex;
     justify-content: center;
-    gap: 12px;
+    gap: 10px;
     flex-wrap: wrap;
-    margin-top: 12px;
-    margin-bottom: 30px;
+    margin-top: 8px;
+    margin-bottom: 18px;
 }}
 
 .badge-box {{
     background: white;
     border: 1px solid var(--border);
     color: #444;
-    padding: 10px 16px;
+    padding: 9px 15px;
     border-radius: 999px;
     font-size: 14px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.04);
@@ -174,7 +169,7 @@ html, body, [class*="css"]  {{
     font-size: 30px;
     font-weight: 900;
     color: var(--text);
-    margin-top: 15px;
+    margin-top: 10px;
     margin-bottom: 18px;
 }}
 
@@ -182,9 +177,9 @@ html, body, [class*="css"]  {{
     background: linear-gradient(180deg, #0d0d0d 0%, #060606 100%);
     border: 2px solid var(--gold);
     border-radius: 22px;
-    padding: 24px 16px;
+    padding: 28px 16px;
     text-align: center;
-    min-height: 170px;
+    min-height: 175px;
     box-shadow: 0 14px 40px rgba(0,0,0,0.14);
 }}
 
@@ -200,7 +195,7 @@ html, body, [class*="css"]  {{
 
 .gold-name {{
     color: #ffffff;
-    font-size: 20px;
+    font-size: 21px;
     font-weight: 800;
     margin-bottom: 12px;
 }}
@@ -214,7 +209,7 @@ html, body, [class*="css"]  {{
 
 .gold-price {{
     color: var(--gold);
-    font-size: 31px;
+    font-size: 33px;
     font-weight: 900;
     line-height: 1.15;
     user-select: none;
@@ -288,17 +283,36 @@ html, body, [class*="css"]  {{
 }}
 
 @media screen and (max-width: 768px) {{
+    .block-container {{
+        padding-top: 0.4rem;
+        padding-bottom: 1rem;
+    }}
+
     .logo-img {{
-        width: 145px;
-        max-width: 145px;
+        width: 95px;
+        max-width: 95px;
     }}
 
     .main-title {{
-        font-size: 34px;
+        font-size: 28px;
     }}
 
     .subtitle {{
-        font-size: 15px;
+        font-size: 14px;
+        margin-bottom: 12px;
+    }}
+
+    .top-badges {{
+        margin-bottom: 16px;
+    }}
+
+    .badge-box {{
+        font-size: 13px;
+        padding: 8px 13px;
+    }}
+
+    .section-title {{
+        font-size: 24px;
     }}
 
     .gold-price {{
@@ -326,12 +340,10 @@ html, body, [class*="css"]  {{
 DEFAULT_CARPANLAR = {
     "24 Ayar Gram": 1.000,
     "22 Ayar Gram": 0.916,
-    "14 Ayar Gram": 0.585,
     "Çeyrek Altın": 1.760,
     "Yarım Altın": 3.520,
     "Tam Altın": 7.040,
     "Ata Lira": 7.216,
-    "Cumhuriyet Altını": 7.216,
     "22 Ayar Bilezik": 0.916
 }
 
@@ -646,7 +658,7 @@ if ADMIN_MODE:
 
 st.markdown("<div class='section-title'>Canlı Altın Fiyat Panosu</div>", unsafe_allow_html=True)
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 
 with col1:
     fiyat_karti("24 Ayar Gram", fiyatlar["24 Ayar Gram"])
@@ -655,26 +667,20 @@ with col2:
     fiyat_karti("22 Ayar Gram", fiyatlar["22 Ayar Gram"])
 
 with col3:
-    fiyat_karti("14 Ayar Gram", fiyatlar["14 Ayar Gram"])
-
-with col4:
     fiyat_karti("Çeyrek Altın", fiyatlar["Çeyrek Altın"])
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-col5, col6, col7, col8 = st.columns(4)
+col4, col5, col6 = st.columns(3)
 
-with col5:
+with col4:
     fiyat_karti("Yarım Altın", fiyatlar["Yarım Altın"])
 
-with col6:
+with col5:
     fiyat_karti("Tam Altın", fiyatlar["Tam Altın"])
 
-with col7:
+with col6:
     fiyat_karti("Ata Lira", fiyatlar["Ata Lira"])
-
-with col8:
-    fiyat_karti("Cumhuriyet Altını", fiyatlar["Cumhuriyet Altını"])
 
 
 # =====================================================
