@@ -2,52 +2,91 @@ import streamlit as st
 import requests
 from datetime import datetime
 
+# =========================
+# SAYFA AYARLARI
+# =========================
+
 st.set_page_config(
-    page_title="EP Kuyumculuk Satış Ekranı",
+    page_title="EP Kuyumculuk Altın Fiyat Hesaplama",
     page_icon="💎",
     layout="centered"
 )
 
+# =========================
+# TASARIM
+# =========================
+
 st.markdown("""
 <style>
 .main-title {
-    font-size: 44px;
-    font-weight: 800;
+    font-size: 46px;
+    font-weight: 900;
     color: #2c2c35;
     line-height: 1.2;
-    margin-bottom: 25px;
+    margin-bottom: 30px;
+    text-align: center;
 }
+
+.subtitle {
+    font-size: 18px;
+    color: #666;
+    text-align: center;
+    margin-top: -15px;
+    margin-bottom: 35px;
+}
+
 .price-box { 
-    font-size: 56px; 
+    font-size: 60px; 
     color: #D4AF37; 
     font-weight: 900; 
     text-align: center; 
     background: #050505; 
-    padding: 28px; 
-    border-radius: 18px; 
+    padding: 35px 20px; 
+    border-radius: 20px; 
     border: 2px solid #D4AF37;
-    box-shadow: 0 12px 35px rgba(0,0,0,0.18);
+    box-shadow: 0 16px 45px rgba(0,0,0,0.18);
+    user-select: none;
 }
+
 .info-box {
     background: #faf7ef;
-    padding: 16px;
-    border-radius: 12px;
+    padding: 20px;
+    border-radius: 14px;
     border: 1px solid #ead9a7;
-    margin-top: 18px;
+    margin-top: 22px;
+    font-size: 17px;
+    line-height: 1.8;
 }
+
 .small-note {
-    font-size: 13px;
+    font-size: 14px;
     color: #666;
     text-align: center;
-    margin-top: 10px;
+    margin-top: 18px;
+    line-height: 1.5;
+}
+
+.footer-brand {
+    text-align: center;
+    margin-top: 35px;
+    font-size: 14px;
+    color: #999;
 }
 </style>
 """, unsafe_allow_html=True)
 
 
+# =========================
+# FİYAT FORMAT TEMİZLEME
+# =========================
+
 def temizle_ve_cevir(fiyat):
     """
-    6.750,50 / 6750.50 / 6,750.50 / 6750 gibi formatları float'a çevirir.
+    Fiyat formatlarını sayıya çevirir.
+    Örnek:
+    6.647,92 -> 6647.92
+    6647.92 -> 6647.92
+    6,647.92 -> 6647.92
     """
     if fiyat is None:
         return None
@@ -65,7 +104,7 @@ def temizle_ve_cevir(fiyat):
 
 def recursive_find_price(data, possible_keys):
     """
-    JSON içinde farklı isimlerle gelebilecek gram altın satış fiyatını arar.
+    API'den gelen JSON içinde gram altın satış fiyatını arar.
     """
     if isinstance(data, dict):
         for key, value in data.items():
@@ -92,6 +131,10 @@ def recursive_find_price(data, possible_keys):
 
     return None
 
+
+# =========================
+# CANLI FİYAT VERİSİ
+# =========================
 
 @st.cache_data(ttl=60)
 def fiyat_al():
@@ -133,14 +176,13 @@ def fiyat_al():
 
     for kaynak in kaynaklar:
         try:
-            r = requests.get(kaynak["url"], headers=headers, timeout=8)
+            response = requests.get(kaynak["url"], headers=headers, timeout=8)
 
-            if r.status_code != 200:
-                son_hatalar.append(f"{kaynak['ad']}: HTTP {r.status_code}")
+            if response.status_code != 200:
+                son_hatalar.append(f"{kaynak['ad']}: HTTP {response.status_code}")
                 continue
 
-            data = r.json()
-
+            data = response.json()
             fiyat = recursive_find_price(data, possible_keys)
 
             if fiyat and fiyat > 0:
@@ -162,38 +204,43 @@ def fiyat_al():
     }
 
 
-st.markdown("<div class='main-title'>💎 EP Kuyumculuk<br>Canlı Satış Ekranı</div>", unsafe_allow_html=True)
+# =========================
+# ARAYÜZ
+# =========================
+
+st.markdown(
+    "<div class='main-title'>💎 EP Kuyumculuk<br>Güncel Altın Fiyat Hesaplama</div>",
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    "<div class='subtitle'>Ürün gramını girerek yaklaşık satış fiyatını öğrenebilirsiniz.</div>",
+    unsafe_allow_html=True
+)
 
 sonuc = fiyat_al()
 gram_altin = sonuc["fiyat"]
 
 if gram_altin:
-    col1, col2 = st.columns(2)
 
-    with col1:
-        urun_gram = st.number_input(
-            "Ürün Gramı",
-            min_value=0.10,
-            value=5.00,
-            step=0.10,
-            format="%.2f"
-        )
+    urun_gram = st.number_input(
+        "Ürün Gramı",
+        min_value=0.10,
+        value=1.00,
+        step=0.10,
+        format="%.2f"
+    )
 
-    with col2:
-        isci_kar = st.number_input(
-            "İşçilik / Kâr Oranı (%)",
-            min_value=0.0,
-            max_value=100.0,
-            value=10.0,
-            step=1.0
-        )
+    # Müşteriye gösterilmeyen mağaza oranı
+    # Bunu daha sonra istersen 8, 10, 12, 15 gibi değiştirebiliriz.
+    magaza_orani = 10.0
 
-    net_fiyat = (urun_gram * gram_altin) * (1 + (isci_kar / 100))
+    hesaplanan_fiyat = (urun_gram * gram_altin) * (1 + (magaza_orani / 100))
 
     st.markdown("---")
 
     st.markdown(
-        f"<div class='price-box'>{net_fiyat:,.2f} TL</div>",
+        f"<div class='price-box'>{hesaplanan_fiyat:,.2f} TL</div>",
         unsafe_allow_html=True
     )
 
@@ -201,13 +248,17 @@ if gram_altin:
     <div class='info-box'>
         <b>Ürün Gramı:</b> {urun_gram:.2f} gr<br>
         <b>Güncel Gram Altın:</b> {gram_altin:,.2f} TL<br>
-        <b>Veri Kaynağı:</b> {sonuc["kaynak"]}<br>
         <b>Son Güncelleme:</b> {datetime.now().strftime("%d.%m.%Y %H:%M")}
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown(
-        "<div class='small-note'>Fiyatlar piyasa değişimlerine göre güncellenir. Nihai satış fiyatı mağaza onayına tabidir.</div>",
+        "<div class='small-note'>Bu ekran bilgilendirme amaçlıdır. Nihai fiyat ürün modeli, işçilik ve mağaza onayına göre netleşir.</div>",
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        "<div class='footer-brand'>EP Kuyumculuk</div>",
         unsafe_allow_html=True
     )
 
