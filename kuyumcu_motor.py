@@ -108,8 +108,9 @@ html, body, [class*="css"]  {{
 }}
 
 .block-container {{
-    padding-top: 0.6rem;
+    padding-top: 1.2rem;
     padding-bottom: 1.2rem;
+    overflow: visible !important;
 }}
 
 .logo-area {{
@@ -117,16 +118,19 @@ html, body, [class*="css"]  {{
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-top: 0px;
-    margin-bottom: 6px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    padding-top: 10px;
+    overflow: visible !important;
 }}
 
 .logo-img {{
-    width: 115px;
-    max-width: 115px;
+    width: 125px;
+    max-width: 125px;
     height: auto;
     display: block;
     object-fit: contain;
+    overflow: visible !important;
 }}
 
 .main-title {{
@@ -284,13 +288,22 @@ html, body, [class*="css"]  {{
 
 @media screen and (max-width: 768px) {{
     .block-container {{
-        padding-top: 0.4rem;
+        padding-top: 1rem;
         padding-bottom: 1rem;
+        overflow: visible !important;
+    }}
+
+    .logo-area {{
+        margin-top: 6px;
+        margin-bottom: 8px;
+        padding-top: 8px;
+        overflow: visible !important;
     }}
 
     .logo-img {{
-        width: 95px;
-        max-width: 95px;
+        width: 105px;
+        max-width: 105px;
+        overflow: visible !important;
     }}
 
     .main-title {{
