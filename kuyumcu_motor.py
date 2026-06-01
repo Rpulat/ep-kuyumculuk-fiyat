@@ -558,7 +558,7 @@ def header_olustur(kaynak, has_altin, cekilme_zamani):
         st.warning("Logo dosyası bulunamadı. Repo içine 'logo.png' adıyla yükleyin.")
 
     st.markdown(
-        "<div class='main-title'>EP Kuyumculuk<br>Canlı Fiyat Ekranı</div>",
+        "<div class='main-title'>ENES PULAT Kuyumculuk<br>Canlı Fiyat Ekranı</div>",
         unsafe_allow_html=True
     )
 
