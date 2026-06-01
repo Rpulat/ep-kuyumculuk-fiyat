@@ -16,6 +16,18 @@ st.set_page_config(
 )
 
 # =====================================================
+# ADMIN MODU
+# =====================================================
+# Müşteri normal linkten girer:
+# https://epkuyumculuk.streamlit.app
+#
+# Yönetici özel linkten girer:
+# https://epkuyumculuk.streamlit.app/?admin=1
+
+ADMIN_MODE = st.query_params.get("admin") == "1"
+
+
+# =====================================================
 # TÜRKİYE SAATİ
 # =====================================================
 
@@ -28,7 +40,7 @@ def turkiye_saati_formatli():
 
 
 # =====================================================
-# LOGO YARDIMCI FONKSİYONU
+# LOGO
 # =====================================================
 
 def logo_base64_yap(dosya_yolu):
@@ -40,9 +52,48 @@ def logo_base64_yap(dosya_yolu):
 # TASARIM
 # =====================================================
 
-st.markdown("""
+streamlit_gizleme_css = ""
+
+if not ADMIN_MODE:
+    streamlit_gizleme_css = """
+    footer {
+        visibility: hidden !important;
+        height: 0 !important;
+    }
+
+    footer:after {
+        content: "" !important;
+        display: none !important;
+    }
+
+    .stDeployButton {
+        display: none !important;
+    }
+
+    [data-testid="stToolbar"] {
+        display: none !important;
+    }
+
+    [data-testid="stDecoration"] {
+        display: none !important;
+    }
+
+    [data-testid="stStatusWidget"] {
+        display: none !important;
+    }
+
+    [data-testid="collapsedControl"] {
+        display: none !important;
+    }
+
+    [data-testid="stSidebar"] {
+        display: none !important;
+    }
+    """
+
+st.markdown(f"""
 <style>
-:root {
+:root {{
     --gold: #D4AF37;
     --gold-soft: #e6c96b;
     --dark: #0b0b0b;
@@ -50,36 +101,35 @@ st.markdown("""
     --text: #2c2c35;
     --muted: #777777;
     --border: #e8d8a2;
-}
+}}
 
-html, body, [class*="css"]  {
+html, body, [class*="css"]  {{
     font-family: "Segoe UI", sans-serif;
-}
+}}
 
-.block-container {
+.block-container {{
     padding-top: 2rem;
     padding-bottom: 2rem;
-}
+}}
 
-/* LOGO VE HEADER */
-.logo-area {
+.logo-area {{
     width: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
     margin-top: 10px;
     margin-bottom: 18px;
-}
+}}
 
-.logo-img {
+.logo-img {{
     width: 190px;
     max-width: 190px;
     height: auto;
     display: block;
     object-fit: contain;
-}
+}}
 
-.main-title {
+.main-title {{
     font-size: 48px;
     font-weight: 900;
     color: var(--text);
@@ -87,25 +137,25 @@ html, body, [class*="css"]  {
     text-align: center;
     margin-top: 5px;
     margin-bottom: 8px;
-}
+}}
 
-.subtitle {
+.subtitle {{
     font-size: 18px;
     color: var(--muted);
     text-align: center;
     margin-bottom: 25px;
-}
+}}
 
-.top-badges {
+.top-badges {{
     display: flex;
     justify-content: center;
     gap: 12px;
     flex-wrap: wrap;
     margin-top: 12px;
     margin-bottom: 30px;
-}
+}}
 
-.badge-box {
+.badge-box {{
     background: white;
     border: 1px solid var(--border);
     color: #444;
@@ -113,17 +163,17 @@ html, body, [class*="css"]  {
     border-radius: 999px;
     font-size: 14px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.04);
-}
+}}
 
-.section-title {
+.section-title {{
     font-size: 30px;
     font-weight: 900;
     color: var(--text);
     margin-top: 15px;
     margin-bottom: 18px;
-}
+}}
 
-.gold-card {
+.gold-card {{
     background: linear-gradient(180deg, #0d0d0d 0%, #060606 100%);
     border: 2px solid var(--gold);
     border-radius: 22px;
@@ -131,30 +181,30 @@ html, body, [class*="css"]  {
     text-align: center;
     min-height: 170px;
     box-shadow: 0 14px 40px rgba(0,0,0,0.14);
-}
+}}
 
-.gold-name {
+.gold-name {{
     color: #ffffff;
     font-size: 20px;
     font-weight: 800;
     margin-bottom: 12px;
-}
+}}
 
-.gold-price {
+.gold-price {{
     color: var(--gold);
     font-size: 31px;
     font-weight: 900;
     line-height: 1.15;
     user-select: none;
-}
+}}
 
-.gold-sub {
+.gold-sub {{
     color: #b7b7b7;
     font-size: 13px;
     margin-top: 10px;
-}
+}}
 
-.price-box {
+.price-box {{
     font-size: 58px;
     color: var(--gold);
     font-weight: 900;
@@ -166,9 +216,9 @@ html, body, [class*="css"]  {
     box-shadow: 0 16px 45px rgba(0,0,0,0.18);
     user-select: none;
     margin-top: 6px;
-}
+}}
 
-.info-box {
+.info-box {{
     background: #fcfaf4;
     padding: 22px;
     border-radius: 16px;
@@ -177,58 +227,59 @@ html, body, [class*="css"]  {
     font-size: 17px;
     line-height: 1.9;
     color: #2b2b2b;
-}
+}}
 
-.small-note {
+.small-note {{
     font-size: 14px;
     color: #666;
     text-align: center;
     margin-top: 18px;
     line-height: 1.6;
-}
+}}
 
-.footer-brand {
+.footer-brand {{
     text-align: center;
     margin-top: 34px;
     font-size: 14px;
     color: #999;
-}
+}}
 
-.sidebar-title {
+.sidebar-title {{
     font-size: 20px;
     font-weight: 800;
     margin-bottom: 8px;
-}
+}}
 
-.sidebar-note {
+.sidebar-note {{
     font-size: 13px;
     color: #777;
     margin-bottom: 14px;
-}
+}}
 
-/* MOBİL UYUMLULUK */
-@media screen and (max-width: 768px) {
-    .logo-img {
+@media screen and (max-width: 768px) {{
+    .logo-img {{
         width: 145px;
         max-width: 145px;
-    }
+    }}
 
-    .main-title {
+    .main-title {{
         font-size: 34px;
-    }
+    }}
 
-    .subtitle {
+    .subtitle {{
         font-size: 15px;
-    }
+    }}
 
-    .gold-price {
+    .gold-price {{
         font-size: 25px;
-    }
+    }}
 
-    .price-box {
+    .price-box {{
         font-size: 38px;
-    }
-}
+    }}
+}}
+
+{streamlit_gizleme_css}
 </style>
 """, unsafe_allow_html=True)
 
@@ -428,6 +479,9 @@ def fiyatlari_olustur(has_altin):
 # =====================================================
 
 def yonetici_paneli():
+    if not ADMIN_MODE:
+        return
+
     with st.sidebar:
         st.markdown("<div class='sidebar-title'>🔐 Yönetici Paneli</div>", unsafe_allow_html=True)
         st.markdown("<div class='sidebar-note'>Çarpanları ve mağaza oranlarını sadece siz yönetin.</div>", unsafe_allow_html=True)
@@ -541,6 +595,7 @@ fiyatlar = fiyatlari_olustur(has_altin)
 
 header_olustur(veri["kaynak"], has_altin, veri["cekilme_zamani"])
 
+
 # =====================================================
 # CANLI FİYAT PANOSU
 # =====================================================
@@ -624,6 +679,7 @@ with col8:
         <div class='gold-sub'>Anlık satış fiyatı</div>
     </div>
     """, unsafe_allow_html=True)
+
 
 # =====================================================
 # TAKI FİYAT HESAPLAMA
