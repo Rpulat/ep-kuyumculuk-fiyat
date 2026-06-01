@@ -1,13 +1,14 @@
 import streamlit as st
 import requests
 from datetime import datetime
+import os
 
 # =====================================================
 # SAYFA AYARLARI
 # =====================================================
 
 st.set_page_config(
-    page_title="EP Kuyumculuk Canlı Altın Fiyatları",
+    page_title="ENES PULAT Kuyumculuk Canlı Fiyat Ekranı",
     page_icon="💎",
     layout="wide"
 )
@@ -18,106 +19,172 @@ st.set_page_config(
 
 st.markdown("""
 <style>
+:root {
+    --gold: #D4AF37;
+    --gold-soft: #e6c96b;
+    --dark: #0b0b0b;
+    --soft-bg: #f7f5ef;
+    --text: #2c2c35;
+    --muted: #777777;
+    --border: #e8d8a2;
+}
+
+/* Genel */
+html, body, [class*="css"]  {
+    font-family: "Segoe UI", sans-serif;
+}
+
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+/* Header */
+.brand-wrap {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
 .main-title {
     font-size: 48px;
     font-weight: 900;
-    color: #2c2c35;
-    line-height: 1.2;
-    margin-bottom: 10px;
+    color: var(--text);
+    line-height: 1.15;
     text-align: center;
+    margin-top: 5px;
+    margin-bottom: 8px;
 }
 
 .subtitle {
     font-size: 18px;
-    color: #666;
+    color: var(--muted);
     text-align: center;
-    margin-bottom: 35px;
+    margin-bottom: 25px;
 }
 
+.top-badges {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    margin-bottom: 30px;
+}
+
+.badge-box {
+    background: white;
+    border: 1px solid var(--border);
+    color: #444;
+    padding: 10px 16px;
+    border-radius: 999px;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+/* Başlıklar */
 .section-title {
     font-size: 30px;
     font-weight: 900;
-    color: #2c2c35;
-    margin-top: 25px;
-    margin-bottom: 20px;
+    color: var(--text);
+    margin-top: 15px;
+    margin-bottom: 18px;
 }
 
+/* Kartlar */
 .gold-card {
-    background: #050505;
-    border: 2px solid #D4AF37;
-    border-radius: 20px;
-    padding: 26px 16px;
+    background: linear-gradient(180deg, #0d0d0d 0%, #060606 100%);
+    border: 2px solid var(--gold);
+    border-radius: 22px;
+    padding: 24px 16px;
     text-align: center;
-    box-shadow: 0 14px 38px rgba(0,0,0,0.16);
-    min-height: 160px;
+    min-height: 170px;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.14);
 }
 
 .gold-name {
     color: #ffffff;
-    font-size: 21px;
+    font-size: 20px;
     font-weight: 800;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
 }
 
 .gold-price {
-    color: #D4AF37;
+    color: var(--gold);
     font-size: 31px;
     font-weight: 900;
+    line-height: 1.15;
     user-select: none;
 }
 
 .gold-sub {
-    color: #aaa;
+    color: #b7b7b7;
     font-size: 13px;
-    margin-top: 8px;
+    margin-top: 10px;
 }
 
-.price-box { 
-    font-size: 58px; 
-    color: #D4AF37; 
-    font-weight: 900; 
-    text-align: center; 
-    background: #050505; 
-    padding: 35px 20px; 
-    border-radius: 22px; 
-    border: 2px solid #D4AF37;
+/* Büyük hesap fiyat kutusu */
+.price-box {
+    font-size: 58px;
+    color: var(--gold);
+    font-weight: 900;
+    text-align: center;
+    background: linear-gradient(180deg, #0d0d0d 0%, #050505 100%);
+    padding: 36px 20px;
+    border-radius: 24px;
+    border: 2px solid var(--gold);
     box-shadow: 0 16px 45px rgba(0,0,0,0.18);
     user-select: none;
+    margin-top: 6px;
 }
 
+/* Bilgi kutusu */
 .info-box {
-    background: #faf7ef;
-    padding: 20px;
-    border-radius: 15px;
-    border: 1px solid #ead9a7;
+    background: #fcfaf4;
+    padding: 22px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
     margin-top: 22px;
     font-size: 17px;
-    line-height: 1.8;
+    line-height: 1.9;
+    color: #2b2b2b;
 }
 
+/* Not */
 .small-note {
     font-size: 14px;
     color: #666;
     text-align: center;
     margin-top: 18px;
-    line-height: 1.5;
+    line-height: 1.6;
 }
 
+/* Alt footer */
 .footer-brand {
     text-align: center;
-    margin-top: 35px;
+    margin-top: 34px;
     font-size: 14px;
     color: #999;
+}
+
+/* Sidebar */
+.sidebar-title {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 8px;
+}
+
+.sidebar-note {
+    font-size: 13px;
+    color: #777;
+    margin-bottom: 14px;
 }
 </style>
 """, unsafe_allow_html=True)
 
 
 # =====================================================
-# VARSAYILAN ÇARPANLAR
+# VARSAYILAN AYARLAR
 # =====================================================
-# Buradaki değerler ilk açılışta kullanılır.
-# Yönetici panelinden geçici olarak değiştirilebilir.
 
 DEFAULT_CARPANLAR = {
     "24 Ayar Gram": 1.000,
@@ -130,7 +197,6 @@ DEFAULT_CARPANLAR = {
     "Cumhuriyet Altını": 7.216
 }
 
-# Ürün hesaplama tarafındaki mağaza oranları
 DEFAULT_MAGAZA_ORANLARI = {
     "14 Ayar Takı": 20.0,
     "22 Ayar Takı": 12.0,
@@ -165,7 +231,10 @@ def temizle_ve_cevir(fiyat):
     elif "," in fiyat:
         fiyat = fiyat.replace(",", ".")
 
-    return float(fiyat)
+    try:
+        return float(fiyat)
+    except:
+        return None
 
 
 def para_formatla(tutar):
@@ -200,23 +269,18 @@ def veri_icinden_fiyat_bul(data, aranan_kelimeler):
                         "Satis", "satis_fiyat", "sell", "price"
                     ]:
                         if sell_key in value:
-                            try:
-                                return temizle_ve_cevir(value[sell_key])
-                            except:
-                                pass
-
-                    for possible_value in value.values():
-                        try:
-                            fiyat = temizle_ve_cevir(possible_value)
+                            fiyat = temizle_ve_cevir(value[sell_key])
                             if fiyat and fiyat > 0:
                                 return fiyat
-                        except:
-                            pass
+
+                    for possible_value in value.values():
+                        fiyat = temizle_ve_cevir(possible_value)
+                        if fiyat and fiyat > 0:
+                            return fiyat
                 else:
-                    try:
-                        return temizle_ve_cevir(value)
-                    except:
-                        pass
+                    fiyat = temizle_ve_cevir(value)
+                    if fiyat and fiyat > 0:
+                        return fiyat
 
         for value in data.values():
             result = veri_icinden_fiyat_bul(value, aranan_kelimeler)
@@ -244,22 +308,10 @@ def has_altin_al():
     }
 
     kaynaklar = [
-        {
-            "ad": "Truncgil v4",
-            "url": "https://finans.truncgil.com/v4/today.json"
-        },
-        {
-            "ad": "Truncgil v3",
-            "url": "https://finans.truncgil.com/v3/today.json"
-        },
-        {
-            "ad": "Truncgil eski",
-            "url": "https://finans.truncgil.com/today.json"
-        },
-        {
-            "ad": "GenelPara eski",
-            "url": "https://api.genelpara.com/embed/altin.json"
-        }
+        {"ad": "Truncgil v4", "url": "https://finans.truncgil.com/v4/today.json"},
+        {"ad": "Truncgil v3", "url": "https://finans.truncgil.com/v3/today.json"},
+        {"ad": "Truncgil eski", "url": "https://finans.truncgil.com/today.json"},
+        {"ad": "GenelPara eski", "url": "https://api.genelpara.com/embed/altin.json"}
     ]
 
     son_hatalar = []
@@ -313,10 +365,8 @@ def fiyat_hesapla(has_altin, carpan):
 
 def fiyatlari_olustur(has_altin):
     fiyatlar = {}
-
     for urun_adi, carpan in st.session_state.carpanlar.items():
         fiyatlar[urun_adi] = fiyat_hesapla(has_altin, carpan)
-
     return fiyatlar
 
 
@@ -325,91 +375,110 @@ def fiyatlari_olustur(has_altin):
 # =====================================================
 
 def yonetici_paneli():
-    st.sidebar.markdown("## 🔐 Yönetici Paneli")
+    with st.sidebar:
+        st.markdown("<div class='sidebar-title'>🔐 Yönetici Paneli</div>", unsafe_allow_html=True)
+        st.markdown("<div class='sidebar-note'>Çarpanları ve mağaza oranlarını sadece siz yönetin.</div>", unsafe_allow_html=True)
 
-    admin_sifre = st.sidebar.text_input(
-        "Yönetici Şifresi",
-        type="password"
-    )
+        admin_sifre = st.text_input("Yönetici Şifresi", type="password")
 
-    # İstersen bu şifreyi değiştirebilirsin.
-    # Daha profesyonel sürümde Streamlit Secrets içine alacağız.
-    DOGRU_SIFRE = "1234"
+        DOGRU_SIFRE = "3471"
 
-    if admin_sifre != DOGRU_SIFRE:
-        st.sidebar.info("Çarpanları değiştirmek için şifre giriniz.")
-        return
+        if admin_sifre != DOGRU_SIFRE:
+            st.info("Yönetici ayarlarını açmak için şifre giriniz.")
+            return
 
-    st.sidebar.success("Yönetici girişi aktif")
+        st.success("Yönetici girişi aktif")
 
-    st.sidebar.markdown("### Has Çarpanları")
+        with st.form("admin_form"):
+            st.markdown("### Has Çarpanları")
 
-    yeni_carpanlar = {}
+            yeni_carpanlar = {}
+            for urun_adi, mevcut_carpan in st.session_state.carpanlar.items():
+                yeni_carpanlar[urun_adi] = st.number_input(
+                    f"{urun_adi}",
+                    min_value=0.000,
+                    max_value=20.000,
+                    value=float(mevcut_carpan),
+                    step=0.001,
+                    format="%.3f"
+                )
 
-    for urun_adi, mevcut_carpan in st.session_state.carpanlar.items():
-        yeni_carpanlar[urun_adi] = st.sidebar.number_input(
-            f"{urun_adi}",
-            min_value=0.000,
-            max_value=20.000,
-            value=float(mevcut_carpan),
-            step=0.001,
-            format="%.3f"
-        )
+            st.markdown("### Takı Mağaza Oranları (%)")
 
-    st.sidebar.markdown("### Takı Mağaza Oranları (%)")
+            yeni_oranlar = {}
+            for oran_adi, mevcut_oran in st.session_state.magaza_oranlari.items():
+                yeni_oranlar[oran_adi] = st.number_input(
+                    f"{oran_adi}",
+                    min_value=0.0,
+                    max_value=100.0,
+                    value=float(mevcut_oran),
+                    step=1.0,
+                    format="%.1f"
+                )
 
-    yeni_oranlar = {}
+            col_a, col_b = st.columns(2)
 
-    for oran_adi, mevcut_oran in st.session_state.magaza_oranlari.items():
-        yeni_oranlar[oran_adi] = st.sidebar.number_input(
-            f"{oran_adi}",
-            min_value=0.0,
-            max_value=100.0,
-            value=float(mevcut_oran),
-            step=1.0,
-            format="%.1f"
-        )
+            with col_a:
+                kaydet = st.form_submit_button("Fiyatları Güncelle", use_container_width=True)
 
-    if st.sidebar.button("Fiyatları Güncelle"):
-        st.session_state.carpanlar = yeni_carpanlar.copy()
-        st.session_state.magaza_oranlari = yeni_oranlar.copy()
-        st.sidebar.success("Çarpanlar güncellendi.")
+            with col_b:
+                varsayilan = st.form_submit_button("Varsayılanlara Dön", use_container_width=True)
 
-    if st.sidebar.button("Varsayılan Değerlere Dön"):
-        st.session_state.carpanlar = DEFAULT_CARPANLAR.copy()
-        st.session_state.magaza_oranlari = DEFAULT_MAGAZA_ORANLARI.copy()
-        st.sidebar.success("Varsayılan değerlere dönüldü.")
+        if kaydet:
+            st.session_state.carpanlar = yeni_carpanlar.copy()
+            st.session_state.magaza_oranlari = yeni_oranlar.copy()
+            st.success("Çarpanlar güncellendi.")
+
+        if varsayilan:
+            st.session_state.carpanlar = DEFAULT_CARPANLAR.copy()
+            st.session_state.magaza_oranlari = DEFAULT_MAGAZA_ORANLARI.copy()
+            st.success("Varsayılan değerlere dönüldü.")
 
 
 # =====================================================
-# ARAYÜZ BAŞLANGICI
+# HEADER
+# =====================================================
+
+def header_olustur(kaynak, has_altin):
+    st.markdown("<div class='brand-wrap'>", unsafe_allow_html=True)
+
+    if os.path.exists("logo.png"):
+        col_logo_1, col_logo_2, col_logo_3 = st.columns([1, 2, 1])
+        with col_logo_2:
+            st.image("logo.png", width=180)
+    else:
+        st.warning("Logo dosyası bulunamadı. Repo içine 'logo.png' adıyla yükleyin.")
+
+    st.markdown("<div class='main-title'>EP Kuyumculuk<br>Canlı Fiyat Ekranı</div>", unsafe_allow_html=True)
+    st.markdown("<div class='subtitle'>Güncel has altın verisine göre anlık fiyat panosu ve takı fiyat hesaplama ekranı</div>", unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div class='top-badges'>
+        <div class='badge-box'>📡 Veri Kaynağı: {kaynak}</div>
+        <div class='badge-box'>🟡 Canlı Has Altın: {para_formatla(has_altin)}</div>
+        <div class='badge-box'>🕒 Son Güncelleme: {datetime.now().strftime("%d.%m.%Y %H:%M")}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# =====================================================
+# ANA AKIŞ
 # =====================================================
 
 yonetici_paneli()
-
-st.markdown(
-    "<div class='main-title'>💎 EP Kuyumculuk<br>Canlı Altın Fiyatları</div>",
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    "<div class='subtitle'>Güncel has altın fiyatına göre oluşturulan EP Kuyumculuk fiyat ekranı.</div>",
-    unsafe_allow_html=True
-)
 
 veri = has_altin_al()
 
 if not veri["basarili"]:
     st.error("Piyasa verilerine ulaşılamıyor. Lütfen birkaç dakika sonra tekrar deneyiniz.")
-
     with st.expander("Teknik hata detayları"):
         st.write(veri["hata"])
-
     st.stop()
-
 
 has_altin = veri["has_altin"]
 fiyatlar = fiyatlari_olustur(has_altin)
+
+header_olustur(veri["kaynak"], has_altin)
 
 # =====================================================
 # CANLI FİYAT PANOSU
@@ -424,7 +493,7 @@ with col1:
     <div class='gold-card'>
         <div class='gold-name'>24 Ayar Gram</div>
         <div class='gold-price'>{para_formatla(fiyatlar["24 Ayar Gram"])}</div>
-        <div class='gold-sub'>Çarpan: {st.session_state.carpanlar["24 Ayar Gram"]:.3f}</div>
+        <div class='gold-sub'>Anlık satış fiyatı</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -433,7 +502,7 @@ with col2:
     <div class='gold-card'>
         <div class='gold-name'>22 Ayar Gram</div>
         <div class='gold-price'>{para_formatla(fiyatlar["22 Ayar Gram"])}</div>
-        <div class='gold-sub'>Çarpan: {st.session_state.carpanlar["22 Ayar Gram"]:.3f}</div>
+        <div class='gold-sub'>Anlık satış fiyatı</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -442,7 +511,7 @@ with col3:
     <div class='gold-card'>
         <div class='gold-name'>14 Ayar Gram</div>
         <div class='gold-price'>{para_formatla(fiyatlar["14 Ayar Gram"])}</div>
-        <div class='gold-sub'>Çarpan: {st.session_state.carpanlar["14 Ayar Gram"]:.3f}</div>
+        <div class='gold-sub'>Anlık satış fiyatı</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -451,7 +520,7 @@ with col4:
     <div class='gold-card'>
         <div class='gold-name'>Çeyrek Altın</div>
         <div class='gold-price'>{para_formatla(fiyatlar["Çeyrek Altın"])}</div>
-        <div class='gold-sub'>Çarpan: {st.session_state.carpanlar["Çeyrek Altın"]:.3f}</div>
+        <div class='gold-sub'>Anlık satış fiyatı</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -464,7 +533,7 @@ with col5:
     <div class='gold-card'>
         <div class='gold-name'>Yarım Altın</div>
         <div class='gold-price'>{para_formatla(fiyatlar["Yarım Altın"])}</div>
-        <div class='gold-sub'>Çarpan: {st.session_state.carpanlar["Yarım Altın"]:.3f}</div>
+        <div class='gold-sub'>Anlık satış fiyatı</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -473,7 +542,7 @@ with col6:
     <div class='gold-card'>
         <div class='gold-name'>Tam Altın</div>
         <div class='gold-price'>{para_formatla(fiyatlar["Tam Altın"])}</div>
-        <div class='gold-sub'>Çarpan: {st.session_state.carpanlar["Tam Altın"]:.3f}</div>
+        <div class='gold-sub'>Anlık satış fiyatı</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -482,7 +551,7 @@ with col7:
     <div class='gold-card'>
         <div class='gold-name'>Ata Lira</div>
         <div class='gold-price'>{para_formatla(fiyatlar["Ata Lira"])}</div>
-        <div class='gold-sub'>Çarpan: {st.session_state.carpanlar["Ata Lira"]:.3f}</div>
+        <div class='gold-sub'>Anlık satış fiyatı</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -491,7 +560,7 @@ with col8:
     <div class='gold-card'>
         <div class='gold-name'>Cumhuriyet Altını</div>
         <div class='gold-price'>{para_formatla(fiyatlar["Cumhuriyet Altını"])}</div>
-        <div class='gold-sub'>Çarpan: {st.session_state.carpanlar["Cumhuriyet Altını"]:.3f}</div>
+        <div class='gold-sub'>Anlık satış fiyatı</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -506,7 +575,7 @@ hesap_col1, hesap_col2 = st.columns(2)
 
 with hesap_col1:
     ayar_secimi = st.selectbox(
-        "Altın Ayarı",
+        "Altın Türü",
         ["14 Ayar Takı", "22 Ayar Takı", "24 Ayar Gram"]
     )
 
@@ -538,10 +607,10 @@ st.markdown(
 
 st.markdown(f"""
 <div class='info-box'>
-    <b>Canlı Has Altın:</b> {para_formatla(has_altin)}<br>
-    <b>Seçilen Ürün:</b> {ayar_secimi}<br>
+    <b>Seçilen Tür:</b> {ayar_secimi}<br>
     <b>Ürün Gramı:</b> {urun_gram:.2f} gr<br>
-    <b>Veri Kaynağı:</b> {veri["kaynak"]}<br>
+    <b>Baz Fiyat:</b> {para_formatla(baz_fiyat)}<br>
+    <b>Canlı Has Altın:</b> {para_formatla(has_altin)}<br>
     <b>Son Güncelleme:</b> {datetime.now().strftime("%d.%m.%Y %H:%M")}
 </div>
 """, unsafe_allow_html=True)
@@ -552,6 +621,6 @@ st.markdown(
 )
 
 st.markdown(
-    "<div class='footer-brand'>EP Kuyumculuk</div>",
+    "<div class='footer-brand'>ENES PULAT Kuyumculuk</div>",
     unsafe_allow_html=True
 )
