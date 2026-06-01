@@ -4,6 +4,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
 import base64
+import json
 
 # =====================================================
 # SAYFA AYARLARI
@@ -20,6 +21,59 @@ st.set_page_config(
 # =====================================================
 
 ADMIN_MODE = st.query_params.get("admin") == "1"
+
+# =====================================================
+# KALICI AYAR DOSYASI
+# =====================================================
+
+AYAR_DOSYASI = "ayarlar.json"
+
+# =====================================================
+# VARSAYILAN ÇARPANLAR
+# =====================================================
+
+DEFAULT_CARPANLAR = {
+    "24 Ayar Gram": 1.000,
+    "22 Ayar Gram": 0.916,
+    "Çeyrek Altın": 1.760,
+    "Yarım Altın": 3.520,
+    "Tam Altın": 7.040,
+    "Ata Lira": 7.216,
+    "22 Ayar Bilezik": 0.916
+}
+
+
+def ayarlari_yukle():
+    """
+    Çarpanları kalıcı dosyadan okur.
+    Dosya yoksa varsayılan değerleri döndürür.
+    Eksik ürün varsa varsayılanlardan tamamlar.
+    """
+    if not os.path.exists(AYAR_DOSYASI):
+        return DEFAULT_CARPANLAR.copy()
+
+    try:
+        with open(AYAR_DOSYASI, "r", encoding="utf-8") as file:
+            kayitli_ayarlar = json.load(file)
+
+        carpanlar = DEFAULT_CARPANLAR.copy()
+
+        for urun_adi in DEFAULT_CARPANLAR.keys():
+            if urun_adi in kayitli_ayarlar:
+                carpanlar[urun_adi] = float(kayitli_ayarlar[urun_adi])
+
+        return carpanlar
+
+    except:
+        return DEFAULT_CARPANLAR.copy()
+
+
+def ayarlari_kaydet(carpanlar):
+    """
+    Yönetici panelinden girilen çarpanları ayarlar.json dosyasına kaydeder.
+    """
+    with open(AYAR_DOSYASI, "w", encoding="utf-8") as file:
+        json.dump(carpanlar, file, ensure_ascii=False, indent=4)
 
 
 # =====================================================
@@ -347,29 +401,6 @@ html, body, [class*="css"]  {{
 
 
 # =====================================================
-# VARSAYILAN ÇARPANLAR
-# =====================================================
-
-DEFAULT_CARPANLAR = {
-    "24 Ayar Gram": 1.000,
-    "22 Ayar Gram": 0.916,
-    "Çeyrek Altın": 1.760,
-    "Yarım Altın": 3.520,
-    "Tam Altın": 7.040,
-    "Ata Lira": 7.216,
-    "22 Ayar Bilezik": 0.916
-}
-
-
-# =====================================================
-# SESSION STATE
-# =====================================================
-
-if "carpanlar" not in st.session_state:
-    st.session_state.carpanlar = DEFAULT_CARPANLAR.copy()
-
-
-# =====================================================
 # YARDIMCI FONKSİYONLAR
 # =====================================================
 
@@ -519,9 +550,9 @@ def fiyat_hesapla(has_altin, carpan):
     return has_altin * carpan
 
 
-def fiyatlari_olustur(has_altin):
+def fiyatlari_olustur(has_altin, carpanlar):
     fiyatlar = {}
-    for urun_adi, carpan in st.session_state.carpanlar.items():
+    for urun_adi, carpan in carpanlar.items():
         fiyatlar[urun_adi] = fiyat_hesapla(has_altin, carpan)
     return fiyatlar
 
@@ -530,13 +561,13 @@ def fiyatlari_olustur(has_altin):
 # YÖNETİCİ PANELİ
 # =====================================================
 
-def yonetici_paneli():
+def yonetici_paneli(carpanlar):
     if not ADMIN_MODE:
         return
 
     with st.sidebar:
         st.markdown("<div class='sidebar-title'>🔐 Yönetici Paneli</div>", unsafe_allow_html=True)
-        st.markdown("<div class='sidebar-note'>Çarpanları sadece siz yönetin.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='sidebar-note'>Çarpanları sadece siz yönetin. Değişiklikler kalıcı olarak kaydedilir.</div>", unsafe_allow_html=True)
 
         admin_sifre = st.text_input("Yönetici Şifresi", type="password")
 
@@ -552,7 +583,8 @@ def yonetici_paneli():
             st.markdown("### Has Çarpanları")
 
             yeni_carpanlar = {}
-            for urun_adi, mevcut_carpan in st.session_state.carpanlar.items():
+
+            for urun_adi, mevcut_carpan in carpanlar.items():
                 yeni_carpanlar[urun_adi] = st.number_input(
                     f"{urun_adi}",
                     min_value=0.000,
@@ -571,12 +603,14 @@ def yonetici_paneli():
                 varsayilan = st.form_submit_button("Varsayılanlara Dön", use_container_width=True)
 
         if kaydet:
-            st.session_state.carpanlar = yeni_carpanlar.copy()
-            st.success("Çarpanlar güncellendi.")
+            ayarlari_kaydet(yeni_carpanlar)
+            st.success("Çarpanlar kalıcı olarak kaydedildi.")
+            st.rerun()
 
         if varsayilan:
-            st.session_state.carpanlar = DEFAULT_CARPANLAR.copy()
+            ayarlari_kaydet(DEFAULT_CARPANLAR.copy())
             st.success("Varsayılan değerlere dönüldü.")
+            st.rerun()
 
 
 # =====================================================
@@ -640,7 +674,11 @@ def bilezik_karti(fiyat):
 # ANA AKIŞ
 # =====================================================
 
-yonetici_paneli()
+carpanlar = ayarlari_yukle()
+
+yonetici_paneli(carpanlar)
+
+carpanlar = ayarlari_yukle()
 
 veri = has_altin_al()
 
@@ -651,7 +689,7 @@ if not veri["basarili"]:
     st.stop()
 
 has_altin = veri["has_altin"]
-fiyatlar = fiyatlari_olustur(has_altin)
+fiyatlar = fiyatlari_olustur(has_altin, carpanlar)
 
 header_olustur(has_altin, veri["cekilme_zamani"])
 
@@ -660,7 +698,8 @@ if ADMIN_MODE:
     <div class='admin-source-box'>
         <b>Yönetici Teknik Bilgi:</b><br>
         Veri Kaynağı: {veri["kaynak"]}<br>
-        Canlı Has Altın: {para_formatla(has_altin)}
+        Canlı Has Altın: {para_formatla(has_altin)}<br>
+        Ayar Dosyası: {AYAR_DOSYASI}
     </div>
     """, unsafe_allow_html=True)
 
