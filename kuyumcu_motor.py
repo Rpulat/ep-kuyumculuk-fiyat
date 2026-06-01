@@ -278,6 +278,15 @@ html, body, [class*="css"]  {{
     margin-bottom: 14px;
 }}
 
+.admin-source-box {{
+    background: #fff7df;
+    border: 1px solid #e8d8a2;
+    padding: 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    margin-top: 10px;
+}}
+
 @media screen and (max-width: 768px) {{
     .logo-img {{
         width: 145px;
@@ -549,7 +558,7 @@ def yonetici_paneli():
 # HEADER
 # =====================================================
 
-def header_olustur(kaynak, has_altin, cekilme_zamani):
+def header_olustur(has_altin, cekilme_zamani):
     if os.path.exists("logo.png"):
         logo_base64 = logo_base64_yap("logo.png")
         st.markdown(f"""
@@ -572,7 +581,6 @@ def header_olustur(kaynak, has_altin, cekilme_zamani):
 
     st.markdown(f"""
     <div class='top-badges'>
-        <div class='badge-box'>📡 Veri Kaynağı: {kaynak}</div>
         <div class='badge-box'>🟡 Canlı Has Altın: {para_formatla(has_altin)}</div>
         <div class='badge-box'>🕒 Türkiye Saati: {cekilme_zamani}</div>
     </div>
@@ -620,7 +628,16 @@ if not veri["basarili"]:
 has_altin = veri["has_altin"]
 fiyatlar = fiyatlari_olustur(has_altin)
 
-header_olustur(veri["kaynak"], has_altin, veri["cekilme_zamani"])
+header_olustur(has_altin, veri["cekilme_zamani"])
+
+if ADMIN_MODE:
+    st.markdown(f"""
+    <div class='admin-source-box'>
+        <b>Yönetici Teknik Bilgi:</b><br>
+        Veri Kaynağı: {veri["kaynak"]}<br>
+        Canlı Has Altın: {para_formatla(has_altin)}
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # =====================================================
@@ -678,7 +695,6 @@ st.markdown(f"""
 <div class='info-box'>
     <b>Canlı Has Altın:</b> {para_formatla(has_altin)}<br>
     <b>22 Ayar Bilezik:</b> {para_formatla(fiyatlar["22 Ayar Bilezik"])}<br>
-    <b>Veri Kaynağı:</b> {veri["kaynak"]}<br>
     <b>Türkiye Saati:</b> {veri["cekilme_zamani"]}
 </div>
 """, unsafe_allow_html=True)
