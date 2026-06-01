@@ -1,53 +1,81 @@
 import streamlit as st
 import requests
 
-# Sayfa Yapılandırması
+# 1. Sayfa Yapılandırması
 st.set_page_config(page_title="EP Kuyumculuk Satış Ekranı", layout="centered")
 
 st.markdown("""
     <style>
-    .big-price { font-size: 60px; color: #D4AF37; font-weight: bold; text-align: center; background: #000; padding: 20px; border-radius: 10px; border: 2px solid #D4AF37; }
+    .big-price { 
+        font-size: 60px; 
+        color: #D4AF37; 
+        font-weight: bold; 
+        text-align: center; 
+        background: #000; 
+        padding: 20px; 
+        border-radius: 10px; 
+        border: 2px solid #D4AF37; 
+    }
     </style>
 """, unsafe_allow_html=True)
 
 
-# Stabil Veri Motoru (Özel API Anahtarı İle)
+# Gelen farklı formatlardaki verileri (Örn: 2.450,50) tek tip hesaplanabilir sayıya çevirir
+def temizle_ve_cevir(fiyat_str):
+    fiyat_str = str(fiyat_str)
+    if "." in fiyat_str and "," in fiyat_str:
+        fiyat_str = fiyat_str.replace(".", "").replace(",", ".")
+    elif "," in fiyat_str:
+        fiyat_str = fiyat_str.replace(",", ".")
+    return float(fiyat_str)
+
+
+# 2. Stabil ve Yedekli Veri Motoru
 @st.cache_data(ttl=60)
 def fiyat_al():
+    headers = {'User-Agent': 'Mozilla/5.0'}
+
+    # 1. Kaynak: Truncgil Finans (Bulut sunucularından engellenmez, ücretsiz ve garantilidir)
     try:
-        # Senin özel altin.in API anahtarın doğrudan URL'ye eklendi.
-        # Bu sayede Streamlit Cloud (Bulut) sunucuları engellemeye takılmayacak.
-        url = "https://api.altin.in/api/current?key=hapi_749b7fd0f03041ce93fe1855ecd9c5d7"
-        response = requests.get(url, timeout=10)
-
+        response = requests.get("https://finans.truncgil.com/today.json", headers=headers, timeout=5)
         if response.status_code == 200:
-            return response.json()
+            data = response.json()
+            if "gram-altin" in data:
+                return temizle_ve_cevir(data["gram-altin"]["Selling"])
+            elif "gram-has-altin" in data:
+                return temizle_ve_cevir(data["gram-has-altin"]["Selling"])
+    except:
+        pass
 
-        # Eğer yine hata olursa, hatanın tam sebebini (Örn: 403, 429 gibi) ekrana yazdıracak
-        st.error(f"Sunucu Reddetme Kodu: {response.status_code}")
-        return None
-    except Exception as e:
-        st.error(f"Sistem Hatası: {e}")
-        return None
+    # 2. Kaynak: Genelpara (İlk kaynakta sorun olursa arka planda gizlice devreye girer)
+    try:
+        response = requests.get("https://api.genelpara.com/embed/altin.json", headers=headers, timeout=5)
+        if response.status_code == 200:
+            return temizle_ve_cevir(response.json()['GA']['satis'])
+    except:
+        pass
+
+    return None
 
 
+# 3. Arayüz Tasarımı
 st.title("💎 EP Kuyumculuk - Canlı Satış Ekranı")
 
-data = fiyat_al()
+gram_altin = fiyat_al()
 
-if data and 'gram_altin' in data:
-    gram_altin = float(data['gram_altin']['satis'])
-
+if gram_altin:
     col1, col2 = st.columns(2)
     with col1:
         urun_gram = st.number_input("Ürün Gramı:", min_value=0.1, value=5.0, step=0.1)
     with col2:
         isci_kar = st.slider("İşçilik/Kâr Oranı (%):", 0, 50, 10)
 
-    net_fiyat = (urun_gram * gram_altin) * (1 + (isci_kar / 100))
+    # Hesaplama
+    net_fiyat = (urun_gram * gram_altin) * (1 + (isci_kar / 100.0))
 
+    # Müşteri Gösterimi
     st.markdown("---")
     st.markdown(f"<div class='big-price'>{net_fiyat:,.2f} TL</div>", unsafe_allow_html=True)
-    st.write(f"Güncel Gram Altın: {gram_altin} TL")
+    st.write(f"Güncel Gram Altın (Piyasa): {gram_altin:,.2f} TL")
 else:
-    st.warning("Veri çekilemiyor. API anahtarının süresi dolmuş veya günlük kullanım limiti aşılmış olabilir.")
+    st.error("Piyasa verilerine ulaşılamıyor. Lütfen sayfayı yenileyiniz.")
