@@ -29,6 +29,8 @@ ADMIN_MODE = st.query_params.get("admin") == "1"
 
 SHEET_TAB_ADI = "carpanlar"
 
+DEFAULT_MANUEL_HAS_ALTIN = 6588.67
+
 DEFAULT_CARPANLAR = {
     "24 Ayar Gram": 1.000,
     "22 Ayar Gram": 0.916,
@@ -38,108 +40,6 @@ DEFAULT_CARPANLAR = {
     "Ata Lira": 7.216,
     "22 Ayar Bilezik": 0.916
 }
-
-
-def google_sheets_aktif_mi():
-    try:
-        return "GOOGLE_SHEET_ID" in st.secrets and "gcp_service_account" in st.secrets
-    except Exception:
-        return False
-
-
-def google_sheet_baglan():
-    """
-    Streamlit Secrets içindeki service account bilgisiyle Google Sheet'e bağlanır.
-    """
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-
-    service_account_info = dict(st.secrets["gcp_service_account"])
-    credentials = Credentials.from_service_account_info(
-        service_account_info,
-        scopes=scopes
-    )
-
-    gc = gspread.authorize(credentials)
-    sheet_id = st.secrets["GOOGLE_SHEET_ID"]
-
-    spreadsheet = gc.open_by_key(sheet_id)
-
-    try:
-        worksheet = spreadsheet.worksheet(SHEET_TAB_ADI)
-    except gspread.WorksheetNotFound:
-        worksheet = spreadsheet.add_worksheet(
-            title=SHEET_TAB_ADI,
-            rows=20,
-            cols=2
-        )
-        worksheet.update(
-            "A1:B8",
-            [["urun_adi", "carpan"]] + [[k, v] for k, v in DEFAULT_CARPANLAR.items()]
-        )
-
-    return worksheet
-
-
-def google_sheets_ayarlari_yukle():
-    """
-    Çarpanları Google Sheets'ten okur.
-    Sheet yoksa veya boşsa varsayılan değerleri yazar.
-    """
-    if not google_sheets_aktif_mi():
-        return DEFAULT_CARPANLAR.copy(), "Yerel Varsayılan"
-
-    try:
-        worksheet = google_sheet_baglan()
-        records = worksheet.get_all_records()
-
-        if not records:
-            google_sheets_ayarlari_kaydet(DEFAULT_CARPANLAR.copy())
-            return DEFAULT_CARPANLAR.copy(), "Google Sheets"
-
-        carpanlar = DEFAULT_CARPANLAR.copy()
-
-        for row in records:
-            urun_adi = str(row.get("urun_adi", "")).strip()
-            carpan = row.get("carpan", None)
-
-            if urun_adi in carpanlar and carpan not in [None, ""]:
-                try:
-                    carpanlar[urun_adi] = float(str(carpan).replace(",", "."))
-                except Exception:
-                    pass
-
-        return carpanlar, "Google Sheets"
-
-    except Exception as e:
-        if ADMIN_MODE:
-            st.warning(f"Google Sheets ayarları okunamadı. Varsayılan değerler kullanılıyor. Hata: {e}")
-        return DEFAULT_CARPANLAR.copy(), "Yerel Varsayılan"
-
-
-def google_sheets_ayarlari_kaydet(carpanlar):
-    """
-    Yönetici panelinden girilen çarpanları Google Sheets'e yazar.
-    """
-    if not google_sheets_aktif_mi():
-        return False, "Google Sheets Secrets tanımlı değil."
-
-    try:
-        worksheet = google_sheet_baglan()
-
-        rows = [["urun_adi", "carpan"]]
-        for urun_adi, carpan in carpanlar.items():
-            rows.append([urun_adi, float(carpan)])
-
-        worksheet.clear()
-        worksheet.update("A1:B" + str(len(rows)), rows)
-
-        return True, "Çarpanlar Google Sheets'e kaydedildi."
-
-    except Exception as e:
-        return False, f"Google Sheets kaydı başarısız: {e}"
 
 
 # =====================================================
@@ -152,6 +52,116 @@ def turkiye_saati():
 
 def turkiye_saati_formatli():
     return turkiye_saati().strftime("%d.%m.%Y %H:%M")
+
+
+# =====================================================
+# GOOGLE SHEETS BAĞLANTISI
+# =====================================================
+
+def google_sheets_aktif_mi():
+    try:
+        return "GOOGLE_SHEET_ID" in st.secrets and "gcp_service_account" in st.secrets
+    except Exception:
+        return False
+
+
+def google_sheet_baglan():
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+
+    service_account_info = dict(st.secrets["gcp_service_account"])
+
+    credentials = Credentials.from_service_account_info(
+        service_account_info,
+        scopes=scopes
+    )
+
+    gc = gspread.authorize(credentials)
+    sheet_id = st.secrets["GOOGLE_SHEET_ID"]
+    spreadsheet = gc.open_by_key(sheet_id)
+
+    try:
+        worksheet = spreadsheet.worksheet(SHEET_TAB_ADI)
+    except gspread.WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(
+            title=SHEET_TAB_ADI,
+            rows=30,
+            cols=2
+        )
+
+        rows = [["urun_adi", "carpan"]]
+        for urun_adi, carpan in DEFAULT_CARPANLAR.items():
+            rows.append([urun_adi, carpan])
+        rows.append(["MANUEL_HAS_ALTIN", DEFAULT_MANUEL_HAS_ALTIN])
+
+        worksheet.update("A1:B" + str(len(rows)), rows)
+
+    return worksheet
+
+
+def ayarlari_yukle():
+    carpanlar = DEFAULT_CARPANLAR.copy()
+    manuel_has_altin = DEFAULT_MANUEL_HAS_ALTIN
+    ayar_kaynagi = "Varsayılan"
+
+    if not google_sheets_aktif_mi():
+        return carpanlar, manuel_has_altin, ayar_kaynagi
+
+    try:
+        worksheet = google_sheet_baglan()
+        records = worksheet.get_all_records()
+
+        if not records:
+            ayarlari_kaydet(carpanlar, manuel_has_altin)
+            return carpanlar, manuel_has_altin, "Google Sheets"
+
+        for row in records:
+            urun_adi = str(row.get("urun_adi", "")).strip()
+            carpan = row.get("carpan", "")
+
+            if urun_adi in carpanlar:
+                try:
+                    carpanlar[urun_adi] = float(str(carpan).replace(",", "."))
+                except Exception:
+                    pass
+
+            if urun_adi == "MANUEL_HAS_ALTIN":
+                try:
+                    manuel_has_altin = float(str(carpan).replace(",", "."))
+                except Exception:
+                    pass
+
+        return carpanlar, manuel_has_altin, "Google Sheets"
+
+    except Exception as e:
+        if ADMIN_MODE:
+            st.warning(f"Google Sheets okunamadı. Varsayılan ayarlar kullanılıyor. Hata: {e}")
+        return carpanlar, manuel_has_altin, "Varsayılan"
+
+
+def ayarlari_kaydet(carpanlar, manuel_has_altin):
+    if not google_sheets_aktif_mi():
+        return False, "Google Sheets Secrets tanımlı değil."
+
+    try:
+        worksheet = google_sheet_baglan()
+
+        rows = [["urun_adi", "carpan"]]
+
+        for urun_adi, carpan in carpanlar.items():
+            rows.append([urun_adi, float(carpan)])
+
+        rows.append(["MANUEL_HAS_ALTIN", float(manuel_has_altin)])
+
+        worksheet.clear()
+        worksheet.update("A1:B" + str(len(rows)), rows)
+
+        return True, "Ayarlar Google Sheets'e kaydedildi."
+
+    except Exception as e:
+        return False, f"Google Sheets kaydı başarısız: {e}"
 
 
 # =====================================================
@@ -223,7 +233,7 @@ st.markdown(f"""
     --border: #e8d8a2;
 }}
 
-html, body, [class*="css"]  {{
+html, body, [class*="css"] {{
     font-family: "Segoe UI", sans-serif;
 }}
 
@@ -510,7 +520,7 @@ def temizle_ve_cevir(fiyat):
 
     try:
         return float(fiyat)
-    except:
+    except Exception:
         return None
 
 
@@ -578,7 +588,7 @@ def veri_icinden_fiyat_bul(data, aranan_kelimeler):
 # =====================================================
 
 @st.cache_data(ttl=60)
-def has_altin_al():
+def has_altin_api_al():
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Accept": "application/json,text/plain,*/*"
@@ -614,7 +624,7 @@ def has_altin_al():
                     "basarili": True,
                     "kaynak": kaynak["ad"],
                     "has_altin": gram_altin,
-                    "hata": None,
+                    "hata": son_hatalar,
                     "cekilme_zamani": turkiye_saati_formatli()
                 }
 
@@ -628,6 +638,21 @@ def has_altin_al():
         "kaynak": None,
         "has_altin": None,
         "hata": son_hatalar,
+        "cekilme_zamani": turkiye_saati_formatli()
+    }
+
+
+def has_altin_al(manuel_has_altin):
+    api_veri = has_altin_api_al()
+
+    if api_veri["basarili"]:
+        return api_veri
+
+    return {
+        "basarili": True,
+        "kaynak": "Manuel Google Sheets",
+        "has_altin": manuel_has_altin,
+        "hata": api_veri["hata"],
         "cekilme_zamani": turkiye_saati_formatli()
     }
 
@@ -653,13 +678,13 @@ def fiyatlari_olustur(has_altin, carpanlar):
 # YÖNETİCİ PANELİ
 # =====================================================
 
-def yonetici_paneli(carpanlar, ayar_kaynagi):
+def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi):
     if not ADMIN_MODE:
-        return
+        return carpanlar, manuel_has_altin
 
     with st.sidebar:
         st.markdown("<div class='sidebar-title'>🔐 Yönetici Paneli</div>", unsafe_allow_html=True)
-        st.markdown("<div class='sidebar-note'>Çarpanları sadece siz yönetin. Değişiklikler Google Sheets'e kaydedilir.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='sidebar-note'>Çarpanları ve manuel has altın değerini buradan yönetebilirsiniz.</div>", unsafe_allow_html=True)
 
         admin_sifre = st.text_input("Yönetici Şifresi", type="password")
 
@@ -667,12 +692,22 @@ def yonetici_paneli(carpanlar, ayar_kaynagi):
 
         if admin_sifre != DOGRU_SIFRE:
             st.info("Yönetici ayarlarını açmak için şifre giriniz.")
-            return
+            return carpanlar, manuel_has_altin
 
         st.success("Yönetici girişi aktif")
         st.caption(f"Ayar Kaynağı: {ayar_kaynagi}")
 
         with st.form("admin_form"):
+            st.markdown("### Manuel Has Altın")
+            yeni_manuel_has_altin = st.number_input(
+                "Canlı kaynak çalışmazsa kullanılacak manuel has altın",
+                min_value=0.0,
+                max_value=50000.0,
+                value=float(manuel_has_altin),
+                step=1.0,
+                format="%.2f"
+            )
+
             st.markdown("### Has Çarpanları")
 
             yeni_carpanlar = {}
@@ -690,13 +725,13 @@ def yonetici_paneli(carpanlar, ayar_kaynagi):
             col_a, col_b = st.columns(2)
 
             with col_a:
-                kaydet = st.form_submit_button("Fiyatları Güncelle", use_container_width=True)
+                kaydet = st.form_submit_button("Ayarları Kaydet", use_container_width=True)
 
             with col_b:
                 varsayilan = st.form_submit_button("Varsayılanlara Dön", use_container_width=True)
 
         if kaydet:
-            basarili, mesaj = google_sheets_ayarlari_kaydet(yeni_carpanlar)
+            basarili, mesaj = ayarlari_kaydet(yeni_carpanlar, yeni_manuel_has_altin)
             st.cache_data.clear()
 
             if basarili:
@@ -707,7 +742,7 @@ def yonetici_paneli(carpanlar, ayar_kaynagi):
             st.rerun()
 
         if varsayilan:
-            basarili, mesaj = google_sheets_ayarlari_kaydet(DEFAULT_CARPANLAR.copy())
+            basarili, mesaj = ayarlari_kaydet(DEFAULT_CARPANLAR.copy(), DEFAULT_MANUEL_HAS_ALTIN)
             st.cache_data.clear()
 
             if basarili:
@@ -716,6 +751,8 @@ def yonetici_paneli(carpanlar, ayar_kaynagi):
                 st.error(mesaj)
 
             st.rerun()
+
+    return carpanlar, manuel_has_altin
 
 
 # =====================================================
@@ -792,19 +829,13 @@ def bilezik_karti(fiyat):
 # ANA AKIŞ
 # =====================================================
 
-carpanlar, ayar_kaynagi = google_sheets_ayarlari_yukle()
+carpanlar, manuel_has_altin, ayar_kaynagi = ayarlari_yukle()
 
-yonetici_paneli(carpanlar, ayar_kaynagi)
+carpanlar, manuel_has_altin = yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi)
 
-carpanlar, ayar_kaynagi = google_sheets_ayarlari_yukle()
+carpanlar, manuel_has_altin, ayar_kaynagi = ayarlari_yukle()
 
-veri = has_altin_al()
-
-if not veri["basarili"]:
-    st.error("Piyasa verilerine ulaşılamıyor. Lütfen birkaç dakika sonra tekrar deneyiniz.")
-    with st.expander("Teknik hata detayları"):
-        st.write(veri["hata"])
-    st.stop()
+veri = has_altin_al(manuel_has_altin)
 
 has_altin = veri["has_altin"]
 fiyatlar = fiyatlari_olustur(has_altin, carpanlar)
@@ -818,10 +849,14 @@ if ADMIN_MODE:
     <div class='admin-source-box'>
         <b>Yönetici Teknik Bilgi:</b><br>
         Veri Kaynağı: {veri["kaynak"]}<br>
-        Canlı Has Altın: {para_formatla(has_altin)}<br>
+        Canlı / Manuel Has Altın: {para_formatla(has_altin)}<br>
         Çarpan Kaynağı: {ayar_kaynagi}
     </div>
     """, unsafe_allow_html=True)
+
+    if veri["hata"]:
+        with st.expander("Canlı API hata detayları"):
+            st.write(veri["hata"])
 
 
 # =====================================================
