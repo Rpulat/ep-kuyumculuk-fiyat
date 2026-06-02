@@ -4,6 +4,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
 import base64
+import traceback
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -12,7 +13,7 @@ from google.oauth2.service_account import Credentials
 # =====================================================
 
 st.set_page_config(
-    page_title="ENES PULAT Kuyumculuk Canlı Fiyat Ekranı",
+    page_title="EP Kuyumculuk Canlı Fiyat Ekranı",
     page_icon="💎",
     layout="wide"
 )
@@ -40,6 +41,8 @@ DEFAULT_CARPANLAR = {
     "Ata Lira": 7.216,
     "22 Ayar Bilezik": 0.916
 }
+
+SHEET_HATA_DETAYI = None
 
 
 # =====================================================
@@ -79,7 +82,9 @@ def google_sheet_baglan():
     )
 
     gc = gspread.authorize(credentials)
+
     sheet_id = st.secrets["GOOGLE_SHEET_ID"]
+
     spreadsheet = gc.open_by_key(sheet_id)
 
     try:
@@ -92,8 +97,10 @@ def google_sheet_baglan():
         )
 
         rows = [["urun_adi", "carpan"]]
+
         for urun_adi, carpan in DEFAULT_CARPANLAR.items():
             rows.append([urun_adi, carpan])
+
         rows.append(["MANUEL_HAS_ALTIN", DEFAULT_MANUEL_HAS_ALTIN])
 
         worksheet.update("A1:B" + str(len(rows)), rows)
@@ -102,11 +109,16 @@ def google_sheet_baglan():
 
 
 def ayarlari_yukle():
+    global SHEET_HATA_DETAYI
+
     carpanlar = DEFAULT_CARPANLAR.copy()
     manuel_has_altin = DEFAULT_MANUEL_HAS_ALTIN
     ayar_kaynagi = "Varsayılan"
 
+    SHEET_HATA_DETAYI = None
+
     if not google_sheets_aktif_mi():
+        SHEET_HATA_DETAYI = "Streamlit Secrets içinde GOOGLE_SHEET_ID veya gcp_service_account bulunamadı."
         return carpanlar, manuel_has_altin, ayar_kaynagi
 
     try:
@@ -136,8 +148,7 @@ def ayarlari_yukle():
         return carpanlar, manuel_has_altin, "Google Sheets"
 
     except Exception as e:
-        if ADMIN_MODE:
-            st.warning(f"Google Sheets okunamadı. Varsayılan ayarlar kullanılıyor. Hata: {e}")
+        SHEET_HATA_DETAYI = traceback.format_exc()
         return carpanlar, manuel_has_altin, "Varsayılan"
 
 
@@ -160,8 +171,8 @@ def ayarlari_kaydet(carpanlar, manuel_has_altin):
 
         return True, "Ayarlar Google Sheets'e kaydedildi."
 
-    except Exception as e:
-        return False, f"Google Sheets kaydı başarısız: {e}"
+    except Exception:
+        return False, traceback.format_exc()
 
 
 # =====================================================
@@ -650,7 +661,7 @@ def has_altin_al(manuel_has_altin):
 
     return {
         "basarili": True,
-        "kaynak": "Manuel Google Sheets",
+        "kaynak": "Manuel / Yedek Has Altın",
         "has_altin": manuel_has_altin,
         "hata": api_veri["hata"],
         "cekilme_zamani": turkiye_saati_formatli()
@@ -669,8 +680,10 @@ def fiyat_hesapla(has_altin, carpan):
 
 def fiyatlari_olustur(has_altin, carpanlar):
     fiyatlar = {}
+
     for urun_adi, carpan in carpanlar.items():
         fiyatlar[urun_adi] = fiyat_hesapla(has_altin, carpan)
+
     return fiyatlar
 
 
@@ -688,7 +701,7 @@ def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi):
 
         admin_sifre = st.text_input("Yönetici Şifresi", type="password")
 
-        DOGRU_SIFRE = "3471"
+        DOGRU_SIFRE = "1234"
 
         if admin_sifre != DOGRU_SIFRE:
             st.info("Yönetici ayarlarını açmak için şifre giriniz.")
@@ -737,7 +750,8 @@ def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi):
             if basarili:
                 st.success(mesaj)
             else:
-                st.error(mesaj)
+                st.error("Google Sheets kaydı başarısız.")
+                st.code(mesaj)
 
             st.rerun()
 
@@ -748,7 +762,8 @@ def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi):
             if basarili:
                 st.success("Varsayılan değerlere dönüldü.")
             else:
-                st.error(mesaj)
+                st.error("Google Sheets kaydı başarısız.")
+                st.code(mesaj)
 
             st.rerun()
 
@@ -839,6 +854,11 @@ veri = has_altin_al(manuel_has_altin)
 
 has_altin = veri["has_altin"]
 fiyatlar = fiyatlari_olustur(has_altin, carpanlar)
+
+if ADMIN_MODE and SHEET_HATA_DETAYI:
+    st.warning("Google Sheets okunamadı. Varsayılan ayarlar kullanılıyor.")
+    with st.expander("Google Sheets hata detayları"):
+        st.code(SHEET_HATA_DETAYI)
 
 header_olustur(has_altin, veri["cekilme_zamani"])
 
