@@ -63,13 +63,13 @@ def turkiye_saati_formatli():
 
 def sayi_temizle(deger, varsayilan=None):
     """
-    Google Sheets / API / Türkçe sayı formatlarını güvenli float'a çevirir.
+    Türkçe / İngilizce sayı formatlarını güvenli float'a çevirir.
 
-    Örnekler:
+    Örnek:
     6.588,67 -> 6588.67
     6,588.67 -> 6588.67
-    6588,67 -> 6588.67
-    6588.67 -> 6588.67
+    6588,67  -> 6588.67
+    6588.67  -> 6588.67
     """
 
     if deger is None:
@@ -823,7 +823,7 @@ def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi):
 # HEADER
 # =====================================================
 
-def header_olustur(has_altin, cekilme_zamani):
+def header_olustur(cekilme_zamani):
     if os.path.exists("logo.png"):
         logo_base64 = logo_base64_yap("logo.png")
         st.markdown(f"""
@@ -840,13 +840,12 @@ def header_olustur(has_altin, cekilme_zamani):
     )
 
     st.markdown(
-        "<div class='subtitle'>Güncel has altın verisine göre anlık altın fiyat panosu</div>",
+        "<div class='subtitle'>Güncel piyasa verilerine göre anlık altın fiyat panosu</div>",
         unsafe_allow_html=True
     )
 
     st.markdown(f"""
     <div class='top-badges'>
-        <div class='badge-box'>🟡 Canlı Has Altın: {para_formatla(has_altin)}</div>
         <div class='badge-box'>🕒 Türkiye Saati: {cekilme_zamani}</div>
     </div>
     """, unsafe_allow_html=True)
@@ -909,7 +908,7 @@ if ADMIN_MODE and SHEET_HATA_DETAYI:
     with st.expander("Google Sheets hata detayları"):
         st.code(SHEET_HATA_DETAYI)
 
-header_olustur(has_altin, veri["cekilme_zamani"])
+header_olustur(veri["cekilme_zamani"])
 
 fiyat_guncelle_butonu()
 
@@ -975,7 +974,6 @@ bilezik_karti(fiyatlar["22 Ayar Bilezik"])
 
 st.markdown(f"""
 <div class='info-box'>
-    <b>Canlı Has Altın:</b> {para_formatla(has_altin)}<br>
     <b>22 Ayar Bilezik:</b> {para_formatla(fiyatlar["22 Ayar Bilezik"])}<br>
     <b>Türkiye Saati:</b> {veri["cekilme_zamani"]}
 </div>
