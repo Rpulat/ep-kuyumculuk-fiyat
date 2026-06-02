@@ -58,6 +58,56 @@ def turkiye_saati_formatli():
 
 
 # =====================================================
+# SAYI TEMİZLEME
+# =====================================================
+
+def sayi_temizle(deger, varsayilan=None):
+    """
+    Google Sheets / API / Türkçe sayı formatlarını güvenli float'a çevirir.
+
+    Örnekler:
+    6.588,67 -> 6588.67
+    6,588.67 -> 6588.67
+    6588,67 -> 6588.67
+    6588.67 -> 6588.67
+    """
+
+    if deger is None:
+        return varsayilan
+
+    try:
+        if isinstance(deger, (int, float)):
+            return float(deger)
+
+        metin = str(deger).strip()
+        metin = metin.replace("TL", "")
+        metin = metin.replace("TRY", "")
+        metin = metin.replace("₺", "")
+        metin = metin.replace(" ", "")
+        metin = metin.strip()
+
+        if metin == "":
+            return varsayilan
+
+        if "." in metin and "," in metin:
+            son_nokta = metin.rfind(".")
+            son_virgul = metin.rfind(",")
+
+            if son_virgul > son_nokta:
+                metin = metin.replace(".", "").replace(",", ".")
+            else:
+                metin = metin.replace(",", "")
+
+        elif "," in metin:
+            metin = metin.replace(",", ".")
+
+        return float(metin)
+
+    except Exception:
+        return varsayilan
+
+
+# =====================================================
 # GOOGLE SHEETS BAĞLANTISI
 # =====================================================
 
@@ -131,23 +181,23 @@ def ayarlari_yukle():
 
         for row in records:
             urun_adi = str(row.get("urun_adi", "")).strip()
-            carpan = row.get("carpan", "")
-
-            if urun_adi in carpanlar:
-                try:
-                    carpanlar[urun_adi] = float(str(carpan).replace(",", "."))
-                except Exception:
-                    pass
+            carpan_ham = row.get("carpan", "")
 
             if urun_adi == "MANUEL_HAS_ALTIN":
-                try:
-                    manuel_has_altin = float(str(carpan).replace(",", "."))
-                except Exception:
-                    pass
+                okunan_manuel = sayi_temizle(carpan_ham, DEFAULT_MANUEL_HAS_ALTIN)
+
+                if okunan_manuel and 0 < okunan_manuel < 1000000:
+                    manuel_has_altin = okunan_manuel
+
+            elif urun_adi in carpanlar:
+                okunan_carpan = sayi_temizle(carpan_ham, carpanlar[urun_adi])
+
+                if okunan_carpan and 0 < okunan_carpan <= 20:
+                    carpanlar[urun_adi] = okunan_carpan
 
         return carpanlar, manuel_has_altin, "Google Sheets"
 
-    except Exception as e:
+    except Exception:
         SHEET_HATA_DETAYI = traceback.format_exc()
         return carpanlar, manuel_has_altin, "Varsayılan"
 
@@ -518,21 +568,7 @@ html, body, [class*="css"] {{
 # =====================================================
 
 def temizle_ve_cevir(fiyat):
-    if fiyat is None:
-        return None
-
-    fiyat = str(fiyat).strip()
-    fiyat = fiyat.replace("TL", "").replace("TRY", "").replace("₺", "").strip()
-
-    if "." in fiyat and "," in fiyat:
-        fiyat = fiyat.replace(".", "").replace(",", ".")
-    elif "," in fiyat:
-        fiyat = fiyat.replace(",", ".")
-
-    try:
-        return float(fiyat)
-    except Exception:
-        return None
+    return sayi_temizle(fiyat, None)
 
 
 def para_formatla(tutar):
@@ -712,13 +748,20 @@ def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi):
 
         with st.form("admin_form"):
             st.markdown("### Manuel Has Altın")
+
+            guvenli_manuel_has = sayi_temizle(manuel_has_altin, DEFAULT_MANUEL_HAS_ALTIN)
+
+            if guvenli_manuel_has is None or guvenli_manuel_has <= 0:
+                guvenli_manuel_has = DEFAULT_MANUEL_HAS_ALTIN
+
             yeni_manuel_has_altin = st.number_input(
                 "Canlı kaynak çalışmazsa kullanılacak manuel has altın",
                 min_value=0.0,
-                max_value=50000.0,
-                value=float(manuel_has_altin),
+                max_value=1000000.0,
+                value=float(guvenli_manuel_has),
                 step=1.0,
-                format="%.2f"
+                format="%.2f",
+                key="manuel_has_altin_input"
             )
 
             st.markdown("### Has Çarpanları")
@@ -726,13 +769,19 @@ def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi):
             yeni_carpanlar = {}
 
             for urun_adi, mevcut_carpan in carpanlar.items():
+                guvenli_carpan = sayi_temizle(mevcut_carpan, DEFAULT_CARPANLAR.get(urun_adi, 1.0))
+
+                if guvenli_carpan is None or guvenli_carpan <= 0 or guvenli_carpan > 20:
+                    guvenli_carpan = DEFAULT_CARPANLAR.get(urun_adi, 1.0)
+
                 yeni_carpanlar[urun_adi] = st.number_input(
                     f"{urun_adi}",
                     min_value=0.000,
                     max_value=20.000,
-                    value=float(mevcut_carpan),
+                    value=float(guvenli_carpan),
                     step=0.001,
-                    format="%.3f"
+                    format="%.3f",
+                    key=f"carpan_{urun_adi}"
                 )
 
             col_a, col_b = st.columns(2)
