@@ -4,7 +4,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
 import base64
-import json
+import gspread
+from google.oauth2.service_account import Credentials
 
 # =====================================================
 # SAYFA AYARLARI
@@ -23,14 +24,10 @@ st.set_page_config(
 ADMIN_MODE = st.query_params.get("admin") == "1"
 
 # =====================================================
-# KALICI AYAR DOSYASI
+# GOOGLE SHEETS AYARLARI
 # =====================================================
 
-AYAR_DOSYASI = "ayarlar.json"
-
-# =====================================================
-# VARSAYILAN ÇARPANLAR
-# =====================================================
+SHEET_TAB_ADI = "carpanlar"
 
 DEFAULT_CARPANLAR = {
     "24 Ayar Gram": 1.000,
@@ -43,29 +40,106 @@ DEFAULT_CARPANLAR = {
 }
 
 
-def ayarlari_yukle():
-    if not os.path.exists(AYAR_DOSYASI):
-        return DEFAULT_CARPANLAR.copy()
+def google_sheets_aktif_mi():
+    try:
+        return "GOOGLE_SHEET_ID" in st.secrets and "gcp_service_account" in st.secrets
+    except Exception:
+        return False
+
+
+def google_sheet_baglan():
+    """
+    Streamlit Secrets içindeki service account bilgisiyle Google Sheet'e bağlanır.
+    """
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+
+    service_account_info = dict(st.secrets["gcp_service_account"])
+    credentials = Credentials.from_service_account_info(
+        service_account_info,
+        scopes=scopes
+    )
+
+    gc = gspread.authorize(credentials)
+    sheet_id = st.secrets["GOOGLE_SHEET_ID"]
+
+    spreadsheet = gc.open_by_key(sheet_id)
 
     try:
-        with open(AYAR_DOSYASI, "r", encoding="utf-8") as file:
-            kayitli_ayarlar = json.load(file)
+        worksheet = spreadsheet.worksheet(SHEET_TAB_ADI)
+    except gspread.WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(
+            title=SHEET_TAB_ADI,
+            rows=20,
+            cols=2
+        )
+        worksheet.update(
+            "A1:B8",
+            [["urun_adi", "carpan"]] + [[k, v] for k, v in DEFAULT_CARPANLAR.items()]
+        )
+
+    return worksheet
+
+
+def google_sheets_ayarlari_yukle():
+    """
+    Çarpanları Google Sheets'ten okur.
+    Sheet yoksa veya boşsa varsayılan değerleri yazar.
+    """
+    if not google_sheets_aktif_mi():
+        return DEFAULT_CARPANLAR.copy(), "Yerel Varsayılan"
+
+    try:
+        worksheet = google_sheet_baglan()
+        records = worksheet.get_all_records()
+
+        if not records:
+            google_sheets_ayarlari_kaydet(DEFAULT_CARPANLAR.copy())
+            return DEFAULT_CARPANLAR.copy(), "Google Sheets"
 
         carpanlar = DEFAULT_CARPANLAR.copy()
 
-        for urun_adi in DEFAULT_CARPANLAR.keys():
-            if urun_adi in kayitli_ayarlar:
-                carpanlar[urun_adi] = float(kayitli_ayarlar[urun_adi])
+        for row in records:
+            urun_adi = str(row.get("urun_adi", "")).strip()
+            carpan = row.get("carpan", None)
 
-        return carpanlar
+            if urun_adi in carpanlar and carpan not in [None, ""]:
+                try:
+                    carpanlar[urun_adi] = float(str(carpan).replace(",", "."))
+                except Exception:
+                    pass
 
-    except:
-        return DEFAULT_CARPANLAR.copy()
+        return carpanlar, "Google Sheets"
+
+    except Exception as e:
+        if ADMIN_MODE:
+            st.warning(f"Google Sheets ayarları okunamadı. Varsayılan değerler kullanılıyor. Hata: {e}")
+        return DEFAULT_CARPANLAR.copy(), "Yerel Varsayılan"
 
 
-def ayarlari_kaydet(carpanlar):
-    with open(AYAR_DOSYASI, "w", encoding="utf-8") as file:
-        json.dump(carpanlar, file, ensure_ascii=False, indent=4)
+def google_sheets_ayarlari_kaydet(carpanlar):
+    """
+    Yönetici panelinden girilen çarpanları Google Sheets'e yazar.
+    """
+    if not google_sheets_aktif_mi():
+        return False, "Google Sheets Secrets tanımlı değil."
+
+    try:
+        worksheet = google_sheet_baglan()
+
+        rows = [["urun_adi", "carpan"]]
+        for urun_adi, carpan in carpanlar.items():
+            rows.append([urun_adi, float(carpan)])
+
+        worksheet.clear()
+        worksheet.update("A1:B" + str(len(rows)), rows)
+
+        return True, "Çarpanlar Google Sheets'e kaydedildi."
+
+    except Exception as e:
+        return False, f"Google Sheets kaydı başarısız: {e}"
 
 
 # =====================================================
@@ -579,13 +653,13 @@ def fiyatlari_olustur(has_altin, carpanlar):
 # YÖNETİCİ PANELİ
 # =====================================================
 
-def yonetici_paneli(carpanlar):
+def yonetici_paneli(carpanlar, ayar_kaynagi):
     if not ADMIN_MODE:
         return
 
     with st.sidebar:
         st.markdown("<div class='sidebar-title'>🔐 Yönetici Paneli</div>", unsafe_allow_html=True)
-        st.markdown("<div class='sidebar-note'>Çarpanları sadece siz yönetin. Değişiklikler kalıcı olarak kaydedilir.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='sidebar-note'>Çarpanları sadece siz yönetin. Değişiklikler Google Sheets'e kaydedilir.</div>", unsafe_allow_html=True)
 
         admin_sifre = st.text_input("Yönetici Şifresi", type="password")
 
@@ -596,6 +670,7 @@ def yonetici_paneli(carpanlar):
             return
 
         st.success("Yönetici girişi aktif")
+        st.caption(f"Ayar Kaynağı: {ayar_kaynagi}")
 
         with st.form("admin_form"):
             st.markdown("### Has Çarpanları")
@@ -621,15 +696,25 @@ def yonetici_paneli(carpanlar):
                 varsayilan = st.form_submit_button("Varsayılanlara Dön", use_container_width=True)
 
         if kaydet:
-            ayarlari_kaydet(yeni_carpanlar)
+            basarili, mesaj = google_sheets_ayarlari_kaydet(yeni_carpanlar)
             st.cache_data.clear()
-            st.success("Çarpanlar kalıcı olarak kaydedildi.")
+
+            if basarili:
+                st.success(mesaj)
+            else:
+                st.error(mesaj)
+
             st.rerun()
 
         if varsayilan:
-            ayarlari_kaydet(DEFAULT_CARPANLAR.copy())
+            basarili, mesaj = google_sheets_ayarlari_kaydet(DEFAULT_CARPANLAR.copy())
             st.cache_data.clear()
-            st.success("Varsayılan değerlere dönüldü.")
+
+            if basarili:
+                st.success("Varsayılan değerlere dönüldü.")
+            else:
+                st.error(mesaj)
+
             st.rerun()
 
 
@@ -707,11 +792,11 @@ def bilezik_karti(fiyat):
 # ANA AKIŞ
 # =====================================================
 
-carpanlar = ayarlari_yukle()
+carpanlar, ayar_kaynagi = google_sheets_ayarlari_yukle()
 
-yonetici_paneli(carpanlar)
+yonetici_paneli(carpanlar, ayar_kaynagi)
 
-carpanlar = ayarlari_yukle()
+carpanlar, ayar_kaynagi = google_sheets_ayarlari_yukle()
 
 veri = has_altin_al()
 
@@ -734,7 +819,7 @@ if ADMIN_MODE:
         <b>Yönetici Teknik Bilgi:</b><br>
         Veri Kaynağı: {veri["kaynak"]}<br>
         Canlı Has Altın: {para_formatla(has_altin)}<br>
-        Ayar Dosyası: {AYAR_DOSYASI}
+        Çarpan Kaynağı: {ayar_kaynagi}
     </div>
     """, unsafe_allow_html=True)
 
