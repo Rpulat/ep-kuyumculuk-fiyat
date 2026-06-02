@@ -44,11 +44,6 @@ DEFAULT_CARPANLAR = {
 
 
 def ayarlari_yukle():
-    """
-    Çarpanları kalıcı dosyadan okur.
-    Dosya yoksa varsayılan değerleri döndürür.
-    Eksik ürün varsa varsayılanlardan tamamlar.
-    """
     if not os.path.exists(AYAR_DOSYASI):
         return DEFAULT_CARPANLAR.copy()
 
@@ -69,9 +64,6 @@ def ayarlari_yukle():
 
 
 def ayarlari_kaydet(carpanlar):
-    """
-    Yönetici panelinden girilen çarpanları ayarlar.json dosyasına kaydeder.
-    """
     with open(AYAR_DOSYASI, "w", encoding="utf-8") as file:
         json.dump(carpanlar, file, ensure_ascii=False, indent=4)
 
@@ -210,7 +202,7 @@ html, body, [class*="css"]  {{
     gap: 10px;
     flex-wrap: wrap;
     margin-top: 8px;
-    margin-bottom: 18px;
+    margin-bottom: 14px;
 }}
 
 .badge-box {{
@@ -221,6 +213,32 @@ html, body, [class*="css"]  {{
     border-radius: 999px;
     font-size: 14px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}}
+
+.refresh-area {{
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 4px;
+    margin-bottom: 20px;
+}}
+
+.stButton > button {{
+    background: linear-gradient(135deg, #050505, #1c1c1c) !important;
+    color: #D4AF37 !important;
+    border: 1.8px solid #D4AF37 !important;
+    border-radius: 999px !important;
+    padding: 0.55rem 1.35rem !important;
+    font-weight: 800 !important;
+    font-size: 15px !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.16) !important;
+    transition: all 0.25s ease !important;
+}}
+
+.stButton > button:hover {{
+    transform: translateY(-2px) !important;
+    color: #fff4c2 !important;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.22), 0 0 18px rgba(212,175,55,0.25) !important;
 }}
 
 .section-title {{
@@ -370,7 +388,7 @@ html, body, [class*="css"]  {{
     }}
 
     .top-badges {{
-        margin-bottom: 16px;
+        margin-bottom: 12px;
     }}
 
     .badge-box {{
@@ -604,11 +622,13 @@ def yonetici_paneli(carpanlar):
 
         if kaydet:
             ayarlari_kaydet(yeni_carpanlar)
+            st.cache_data.clear()
             st.success("Çarpanlar kalıcı olarak kaydedildi.")
             st.rerun()
 
         if varsayilan:
             ayarlari_kaydet(DEFAULT_CARPANLAR.copy())
+            st.cache_data.clear()
             st.success("Varsayılan değerlere dönüldü.")
             st.rerun()
 
@@ -644,6 +664,19 @@ def header_olustur(has_altin, cekilme_zamani):
         <div class='badge-box'>🕒 Türkiye Saati: {cekilme_zamani}</div>
     </div>
     """, unsafe_allow_html=True)
+
+
+def fiyat_guncelle_butonu():
+    st.markdown("<div class='refresh-area'>", unsafe_allow_html=True)
+
+    col_left, col_center, col_right = st.columns([1.4, 1, 1.4])
+
+    with col_center:
+        if st.button("🔄 Fiyatları Güncelle", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # =====================================================
@@ -692,6 +725,8 @@ has_altin = veri["has_altin"]
 fiyatlar = fiyatlari_olustur(has_altin, carpanlar)
 
 header_olustur(has_altin, veri["cekilme_zamani"])
+
+fiyat_guncelle_butonu()
 
 if ADMIN_MODE:
     st.markdown(f"""
