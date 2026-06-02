@@ -13,7 +13,7 @@ from google.oauth2.service_account import Credentials
 # =====================================================
 
 st.set_page_config(
-    page_title="EP Kuyumculuk Canlı Fiyat Ekranı",
+    page_title="ENES PULAT Kuyumculuk Canlı Fiyat Ekranı",
     page_icon="💎",
     layout="wide"
 )
@@ -701,7 +701,7 @@ def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi):
 
         admin_sifre = st.text_input("Yönetici Şifresi", type="password")
 
-        DOGRU_SIFRE = "1234"
+        DOGRU_SIFRE = "3471"
 
         if admin_sifre != DOGRU_SIFRE:
             st.info("Yönetici ayarlarını açmak için şifre giriniz.")
