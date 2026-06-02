@@ -19,12 +19,7 @@ st.set_page_config(
 )
 
 ADMIN_MODE = st.query_params.get("admin") == "1"
-
 SHEET_TAB_ADI = "carpanlar"
-
-# Bunlar aktif fiyat kaynağı değildir.
-# Sadece Google Sheet ilk kez boşsa tablo oluşturmak için kullanılır.
-ILK_KURULUM_MANUEL_HAS_ALTIN = 6588.67
 
 ILK_KURULUM_CARPANLAR = {
     "24 Ayar Gram": 1.000,
@@ -35,6 +30,8 @@ ILK_KURULUM_CARPANLAR = {
     "Ata Lira": 7.216,
     "22 Ayar Bilezik": 0.916
 }
+
+ILK_KURULUM_MANUEL_HAS_ALTIN = 6696.00
 
 SHEET_HATA_DETAYI = None
 
@@ -94,6 +91,31 @@ def para_formatla(tutar):
     if tutar is None:
         return "-"
     return f"{tutar:,.2f} TL"
+
+
+# =====================================================
+# METİN NORMALLEŞTİRME
+# =====================================================
+
+def metin_normalize(metin):
+    metin = str(metin).strip()
+    metin = metin.replace("\u00a0", " ")
+    metin = " ".join(metin.split())
+    return metin
+
+
+def urun_adi_normalize(metin):
+    metin = metin_normalize(metin).lower()
+    metin = metin.replace("ı", "i")
+    metin = metin.replace("ğ", "g")
+    metin = metin.replace("ü", "u")
+    metin = metin.replace("ş", "s")
+    metin = metin.replace("ö", "o")
+    metin = metin.replace("ç", "c")
+    metin = metin.replace("_", " ")
+    metin = metin.replace("-", " ")
+    metin = " ".join(metin.split())
+    return metin
 
 
 # =====================================================
@@ -176,33 +198,50 @@ def google_sheetten_ayarlari_oku():
 
     try:
         worksheet = google_sheet_baglan()
-        records = worksheet.get_all_records()
 
-        if not records:
+        values = worksheet.get("A:B")
+
+        if not values or len(values) < 2:
             ilk_kurulum_tablosu_olustur(worksheet)
-            records = worksheet.get_all_records()
+            values = worksheet.get("A:B")
 
         carpanlar = {}
         manuel_has_altin = None
 
-        for row in records:
-            urun_adi = str(row.get("urun_adi", "")).strip()
-            carpan_ham = row.get("carpan", "")
+        beklenen_urun_map = {
+            urun_adi_normalize(urun_adi): urun_adi
+            for urun_adi in ILK_KURULUM_CARPANLAR.keys()
+        }
 
-            if urun_adi == "":
+        for row in values:
+            if len(row) < 2:
                 continue
 
-            if urun_adi == "MANUEL_HAS_ALTIN":
-                okunan_manuel = sayi_temizle(carpan_ham, None)
+            sol = metin_normalize(row[0])
+            sag = row[1]
 
-                if okunan_manuel is not None and 0 < okunan_manuel < 1000000:
+            if sol == "":
+                continue
+
+            sol_norm = urun_adi_normalize(sol)
+
+            if sol_norm in ["urun adi", "urun_adi", "ürün adi", "ürün adı", "urun adı"]:
+                continue
+
+            if sol_norm in ["manuel has altin", "manuel has altın", "manuelhasaltin", "manuel_has_altin"]:
+                okunan_manuel = sayi_temizle(sag, None)
+
+                if okunan_manuel is not None and 0 < okunan_manuel < 10000000:
                     manuel_has_altin = okunan_manuel
 
-            else:
-                okunan_carpan = sayi_temizle(carpan_ham, None)
+                continue
+
+            if sol_norm in beklenen_urun_map:
+                standart_urun_adi = beklenen_urun_map[sol_norm]
+                okunan_carpan = sayi_temizle(sag, None)
 
                 if okunan_carpan is not None and 0 < okunan_carpan <= 20:
-                    carpanlar[urun_adi] = okunan_carpan
+                    carpanlar[standart_urun_adi] = okunan_carpan
 
         eksik_urunler = []
 
@@ -215,8 +254,10 @@ def google_sheetten_ayarlari_oku():
 
         if eksik_urunler:
             SHEET_HATA_DETAYI = (
-                "Google Sheets içinde eksik veya hatalı satırlar var:\n"
+                "Google Sheets içinde eksik veya hatalı satırlar var:\n\n"
                 + "\n".join(eksik_urunler)
+                + "\n\nOkunan ham veri:\n\n"
+                + str(values)
             )
             return None, None, False
 
@@ -236,8 +277,8 @@ def google_sheete_ayarlari_yaz(carpanlar, manuel_has_altin):
 
         rows = [["urun_adi", "carpan"]]
 
-        for urun_adi, carpan in carpanlar.items():
-            rows.append([urun_adi, float(carpan)])
+        for urun_adi in ILK_KURULUM_CARPANLAR.keys():
+            rows.append([urun_adi, float(carpanlar[urun_adi])])
 
         rows.append(["MANUEL_HAS_ALTIN", float(manuel_has_altin)])
 
@@ -555,7 +596,7 @@ html, body, [class*="css"] {{
 
 
 # =====================================================
-# API VERİSİ
+# CANLI API VERİSİ
 # =====================================================
 
 def normalize_text(text):
@@ -734,7 +775,7 @@ def yonetici_paneli(carpanlar, manuel_has_altin, sheet_baglanti_ok):
             yeni_manuel_has_altin = st.number_input(
                 "Canlı kaynak çalışmazsa kullanılacak manuel has altın",
                 min_value=0.0,
-                max_value=1000000.0,
+                max_value=10000000.0,
                 value=float(manuel_has_altin),
                 step=1.0,
                 format="%.2f",
@@ -745,7 +786,9 @@ def yonetici_paneli(carpanlar, manuel_has_altin, sheet_baglanti_ok):
 
             yeni_carpanlar = {}
 
-            for urun_adi, mevcut_carpan in carpanlar.items():
+            for urun_adi in ILK_KURULUM_CARPANLAR.keys():
+                mevcut_carpan = carpanlar[urun_adi]
+
                 yeni_carpanlar[urun_adi] = st.number_input(
                     f"{urun_adi}",
                     min_value=0.000,
