@@ -62,16 +62,6 @@ def turkiye_saati_formatli():
 # =====================================================
 
 def sayi_temizle(deger, varsayilan=None):
-    """
-    Türkçe / İngilizce sayı formatlarını güvenli float'a çevirir.
-
-    Örnek:
-    6.588,67 -> 6588.67
-    6,588.67 -> 6588.67
-    6588,67  -> 6588.67
-    6588.67  -> 6588.67
-    """
-
     if deger is None:
         return varsayilan
 
@@ -164,47 +154,58 @@ def ayarlari_yukle():
     carpanlar = DEFAULT_CARPANLAR.copy()
     manuel_has_altin = DEFAULT_MANUEL_HAS_ALTIN
     ayar_kaynagi = "Varsayılan"
+    sheet_baglanti_ok = False
 
     SHEET_HATA_DETAYI = None
 
     if not google_sheets_aktif_mi():
         SHEET_HATA_DETAYI = "Streamlit Secrets içinde GOOGLE_SHEET_ID veya gcp_service_account bulunamadı."
-        return carpanlar, manuel_has_altin, ayar_kaynagi
+        return carpanlar, manuel_has_altin, ayar_kaynagi, sheet_baglanti_ok
 
     try:
         worksheet = google_sheet_baglan()
         records = worksheet.get_all_records()
 
         if not records:
-            ayarlari_kaydet(carpanlar, manuel_has_altin)
-            return carpanlar, manuel_has_altin, "Google Sheets"
+            rows = [["urun_adi", "carpan"]]
+
+            for urun_adi, carpan in DEFAULT_CARPANLAR.items():
+                rows.append([urun_adi, carpan])
+
+            rows.append(["MANUEL_HAS_ALTIN", DEFAULT_MANUEL_HAS_ALTIN])
+
+            worksheet.update("A1:B" + str(len(rows)), rows)
+            records = worksheet.get_all_records()
 
         for row in records:
             urun_adi = str(row.get("urun_adi", "")).strip()
             carpan_ham = row.get("carpan", "")
 
             if urun_adi == "MANUEL_HAS_ALTIN":
-                okunan_manuel = sayi_temizle(carpan_ham, DEFAULT_MANUEL_HAS_ALTIN)
+                okunan_manuel = sayi_temizle(carpan_ham, None)
 
-                if okunan_manuel and 0 < okunan_manuel < 1000000:
+                if okunan_manuel is not None and 0 < okunan_manuel < 1000000:
                     manuel_has_altin = okunan_manuel
 
             elif urun_adi in carpanlar:
-                okunan_carpan = sayi_temizle(carpan_ham, carpanlar[urun_adi])
+                okunan_carpan = sayi_temizle(carpan_ham, None)
 
-                if okunan_carpan and 0 < okunan_carpan <= 20:
+                if okunan_carpan is not None and 0 < okunan_carpan <= 20:
                     carpanlar[urun_adi] = okunan_carpan
 
-        return carpanlar, manuel_has_altin, "Google Sheets"
+        ayar_kaynagi = "Google Sheets"
+        sheet_baglanti_ok = True
+
+        return carpanlar, manuel_has_altin, ayar_kaynagi, sheet_baglanti_ok
 
     except Exception:
         SHEET_HATA_DETAYI = traceback.format_exc()
-        return carpanlar, manuel_has_altin, "Varsayılan"
+        return carpanlar, manuel_has_altin, ayar_kaynagi, sheet_baglanti_ok
 
 
 def ayarlari_kaydet(carpanlar, manuel_has_altin):
     if not google_sheets_aktif_mi():
-        return False, "Google Sheets Secrets tanımlı değil."
+        return False, "Google Sheets Secrets tanımlı değil. Bu yüzden ayarlar kaydedilemedi."
 
     try:
         worksheet = google_sheet_baglan()
@@ -467,6 +468,29 @@ html, body, [class*="css"] {{
     color: #2b2b2b;
 }}
 
+.safe-error-box {{
+    background: #fff7df;
+    border: 1px solid #e8d8a2;
+    padding: 28px;
+    border-radius: 18px;
+    margin-top: 28px;
+    text-align: center;
+    color: #2c2c35;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.06);
+}}
+
+.safe-error-title {{
+    font-size: 26px;
+    font-weight: 900;
+    margin-bottom: 10px;
+}}
+
+.safe-error-text {{
+    font-size: 16px;
+    color: #666;
+    line-height: 1.7;
+}}
+
 .small-note {{
     font-size: 14px;
     color: #666;
@@ -727,7 +751,7 @@ def fiyatlari_olustur(has_altin, carpanlar):
 # YÖNETİCİ PANELİ
 # =====================================================
 
-def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi):
+def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi, sheet_baglanti_ok):
     if not ADMIN_MODE:
         return carpanlar, manuel_has_altin
 
@@ -745,6 +769,14 @@ def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi):
 
         st.success("Yönetici girişi aktif")
         st.caption(f"Ayar Kaynağı: {ayar_kaynagi}")
+
+        if st.button("🔄 Google Sheets'ten Yenile", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
+        if not sheet_baglanti_ok:
+            st.error("Google Sheets bağlantısı yok. Bu durumda yapılan değişiklikler kalıcı kaydedilemez.")
+            st.warning("Müşteri ekranında fiyat gösterimi güvenlik nedeniyle kapatılır.")
 
         with st.form("admin_form"):
             st.markdown("### Manuel Has Altın")
@@ -793,28 +825,32 @@ def yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi):
                 varsayilan = st.form_submit_button("Varsayılanlara Dön", use_container_width=True)
 
         if kaydet:
-            basarili, mesaj = ayarlari_kaydet(yeni_carpanlar, yeni_manuel_has_altin)
-            st.cache_data.clear()
-
-            if basarili:
-                st.success(mesaj)
+            if not sheet_baglanti_ok:
+                st.error("Google Sheets bağlantısı olmadığı için ayarlar kaydedilmedi.")
             else:
-                st.error("Google Sheets kaydı başarısız.")
-                st.code(mesaj)
+                basarili, mesaj = ayarlari_kaydet(yeni_carpanlar, yeni_manuel_has_altin)
+                st.cache_data.clear()
 
-            st.rerun()
+                if basarili:
+                    st.success(mesaj)
+                    st.rerun()
+                else:
+                    st.error("Google Sheets kaydı başarısız.")
+                    st.code(mesaj)
 
         if varsayilan:
-            basarili, mesaj = ayarlari_kaydet(DEFAULT_CARPANLAR.copy(), DEFAULT_MANUEL_HAS_ALTIN)
-            st.cache_data.clear()
-
-            if basarili:
-                st.success("Varsayılan değerlere dönüldü.")
+            if not sheet_baglanti_ok:
+                st.error("Google Sheets bağlantısı olmadığı için varsayılanlara dönme işlemi kaydedilmedi.")
             else:
-                st.error("Google Sheets kaydı başarısız.")
-                st.code(mesaj)
+                basarili, mesaj = ayarlari_kaydet(DEFAULT_CARPANLAR.copy(), DEFAULT_MANUEL_HAS_ALTIN)
+                st.cache_data.clear()
 
-            st.rerun()
+                if basarili:
+                    st.success("Varsayılan değerlere dönüldü ve Google Sheets'e kaydedildi.")
+                    st.rerun()
+                else:
+                    st.error("Google Sheets kaydı başarısız.")
+                    st.code(mesaj)
 
     return carpanlar, manuel_has_altin
 
@@ -892,25 +928,59 @@ def bilezik_karti(fiyat):
 # ANA AKIŞ
 # =====================================================
 
-carpanlar, manuel_has_altin, ayar_kaynagi = ayarlari_yukle()
+carpanlar, manuel_has_altin, ayar_kaynagi, sheet_baglanti_ok = ayarlari_yukle()
 
-carpanlar, manuel_has_altin = yonetici_paneli(carpanlar, manuel_has_altin, ayar_kaynagi)
-
-carpanlar, manuel_has_altin, ayar_kaynagi = ayarlari_yukle()
+carpanlar, manuel_has_altin = yonetici_paneli(
+    carpanlar,
+    manuel_has_altin,
+    ayar_kaynagi,
+    sheet_baglanti_ok
+)
 
 veri = has_altin_al(manuel_has_altin)
 
 has_altin = veri["has_altin"]
-fiyatlar = fiyatlari_olustur(has_altin, carpanlar)
-
-if ADMIN_MODE and SHEET_HATA_DETAYI:
-    st.warning("Google Sheets okunamadı. Varsayılan ayarlar kullanılıyor.")
-    with st.expander("Google Sheets hata detayları"):
-        st.code(SHEET_HATA_DETAYI)
 
 header_olustur(veri["cekilme_zamani"])
 
 fiyat_guncelle_butonu()
+
+
+# =====================================================
+# GOOGLE SHEETS GÜVENLİK KONTROLÜ
+# =====================================================
+
+if not sheet_baglanti_ok and not ADMIN_MODE:
+    st.markdown("""
+    <div class='safe-error-box'>
+        <div class='safe-error-title'>Fiyatlar Güncelleniyor</div>
+        <div class='safe-error-text'>
+            Canlı fiyat ekranımız kısa süreli olarak güncellenmektedir.<br>
+            En güncel fiyat bilgisi için lütfen mağazamızla iletişime geçiniz.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown(
+        "<div class='small-note'>Yanlış fiyat bilgisi vermemek adına fiyat panosu geçici olarak durdurulmuştur.</div>",
+        unsafe_allow_html=True
+    )
+
+    st.stop()
+
+
+if ADMIN_MODE and SHEET_HATA_DETAYI:
+    st.warning("Google Sheets okunamadı. Müşteri ekranında fiyat gösterimi güvenlik nedeniyle kapatılır.")
+    with st.expander("Google Sheets hata detayları"):
+        st.code(SHEET_HATA_DETAYI)
+
+
+# =====================================================
+# FİYATLAR
+# =====================================================
+
+fiyatlar = fiyatlari_olustur(has_altin, carpanlar)
+
 
 if ADMIN_MODE:
     st.markdown(f"""
@@ -918,7 +988,9 @@ if ADMIN_MODE:
         <b>Yönetici Teknik Bilgi:</b><br>
         Veri Kaynağı: {veri["kaynak"]}<br>
         Canlı / Manuel Has Altın: {para_formatla(has_altin)}<br>
-        Çarpan Kaynağı: {ayar_kaynagi}
+        Çarpan Kaynağı: {ayar_kaynagi}<br>
+        Google Sheets Bağlantısı: {"Aktif" if sheet_baglanti_ok else "Pasif"}<br>
+        Müşteri Güvenlik Modu: {"Aktif - Fiyat gösterilebilir" if sheet_baglanti_ok else "Pasif - Müşteri fiyatları kapalı"}
     </div>
     """, unsafe_allow_html=True)
 
